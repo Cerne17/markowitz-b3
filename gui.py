@@ -220,6 +220,21 @@ class App(ctk.CTk):
         ctk.CTkLabel(painel, text="Buscar Ativos", font=ctk.CTkFont(size=16, weight="bold"),
                      text_color=TEXT).pack(anchor="w", padx=12, pady=(12, 6))
 
+        ctk.CTkLabel(painel, text="Ticker especifico (nao esta na lista abaixo?)",
+                     font=ctk.CTkFont(size=11), text_color=TEXT_MUTED).pack(anchor="w", padx=12)
+        frame_manual = ctk.CTkFrame(painel, fg_color="transparent")
+        frame_manual.pack(fill="x", padx=12, pady=(0, 10))
+        self.entry_ticker_manual = ctk.CTkEntry(frame_manual, placeholder_text="Ex: AURA33", fg_color=SURFACE,
+                                                 border_color=TEXT_MUTED, border_width=1, text_color=TEXT,
+                                                 placeholder_text_color=TEXT_MUTED)
+        self.entry_ticker_manual.pack(side="left", fill="x", expand=True, padx=(0, 6))
+        self.entry_ticker_manual.bind("<Return>", lambda e: self._buscar_ticker_manual())
+        ctk.CTkButton(frame_manual, text="Buscar", width=64, fg_color=HEARTWOOD, hover_color=HEARTWOOD_GLOW,
+                      text_color=INK, command=self._buscar_ticker_manual).pack(side="left")
+
+        ctk.CTkLabel(painel, text="...ou filtre a amostra curada por setor/classe:",
+                     font=ctk.CTkFont(size=11), text_color=TEXT_MUTED).pack(anchor="w", padx=12, pady=(0, 4))
+
         classes = ["Todas"] + [c for c in ("Acoes", "ETFs", "FIIs")
                                 if MAPA_CLASSE[c] in {a["classe"] for a in self.universo_ativos}]
         self.opcao_classe = ctk.CTkOptionMenu(painel, values=classes, fg_color=SURFACE,
@@ -336,6 +351,21 @@ class App(ctk.CTk):
                                  command=lambda a=a: self._selecionar_ativo_explorar(a))
             btn.pack(fill="x", pady=2)
 
+    def _buscar_ticker_manual(self):
+        bruto = self.entry_ticker_manual.get().strip()
+        if not bruto:
+            return
+        ticker_norm = dfx.normaliza_ticker(bruto)
+
+        conhecido = next((a for a in self.universo_ativos if a["ticker"] == ticker_norm), None)
+        ativo = conhecido or {
+            "ticker": ticker_norm,
+            "nome": ticker_norm.replace(".SA", ""),
+            "setor": "Nao listado na amostra curada",
+            "classe": "Outro",
+        }
+        self._selecionar_ativo_explorar(ativo)
+
     def _on_muda_horizonte(self):
         if self.ativo_selecionado_explorar is not None:
             self._selecionar_ativo_explorar(self.ativo_selecionado_explorar)
@@ -367,6 +397,10 @@ class App(ctk.CTk):
     def _atualiza_analise_ativo(self, payload: dict):
         info = payload["info"]
         stats = payload["stats"]
+        ativo = payload["ativo"]
+
+        if ativo["classe"] == "Outro" and info.get("nome_longo"):
+            self.label_titulo_ativo.configure(text=f"{info['nome_longo']} ({ativo['ticker']})")
 
         linhas_info = []
         if info.get("setor"):
