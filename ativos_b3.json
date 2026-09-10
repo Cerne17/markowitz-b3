@@ -1,0 +1,76 @@
+{
+  "_nota": "Amostra curada de ativos B3 por setor (aprox. maiores por valor de mercado). Nao e lista completa da bolsa - serve como ponto de partida p/ busca/selecao na aba Explorar Ativos. Atualize conforme necessario.",
+  "ativos": [
+    {"ticker": "PETR4.SA", "nome": "Petrobras PN", "setor": "Petroleo e Gas"},
+    {"ticker": "PETR3.SA", "nome": "Petrobras ON", "setor": "Petroleo e Gas"},
+    {"ticker": "PRIO3.SA", "nome": "PetroRio", "setor": "Petroleo e Gas"},
+    {"ticker": "RRRP3.SA", "nome": "3R Petroleum", "setor": "Petroleo e Gas"},
+    {"ticker": "VBBR3.SA", "nome": "Vibra Energia", "setor": "Petroleo e Gas"},
+
+    {"ticker": "VALE3.SA", "nome": "Vale", "setor": "Mineracao e Siderurgia"},
+    {"ticker": "CSNA3.SA", "nome": "CSN", "setor": "Mineracao e Siderurgia"},
+    {"ticker": "GGBR4.SA", "nome": "Gerdau PN", "setor": "Mineracao e Siderurgia"},
+    {"ticker": "USIM5.SA", "nome": "Usiminas PNA", "setor": "Mineracao e Siderurgia"},
+    {"ticker": "CMIN3.SA", "nome": "CSN Mineracao", "setor": "Mineracao e Siderurgia"},
+
+    {"ticker": "ITUB4.SA", "nome": "Itau Unibanco PN", "setor": "Bancos"},
+    {"ticker": "BBDC4.SA", "nome": "Bradesco PN", "setor": "Bancos"},
+    {"ticker": "BBAS3.SA", "nome": "Banco do Brasil", "setor": "Bancos"},
+    {"ticker": "SANB11.SA", "nome": "Santander Brasil Units", "setor": "Bancos"},
+    {"ticker": "BPAC11.SA", "nome": "BTG Pactual Units", "setor": "Bancos"},
+
+    {"ticker": "BBSE3.SA", "nome": "BB Seguridade", "setor": "Seguros e Financeiro"},
+    {"ticker": "PSSA3.SA", "nome": "Porto Seguro", "setor": "Seguros e Financeiro"},
+    {"ticker": "IRBR3.SA", "nome": "IRB Brasil RE", "setor": "Seguros e Financeiro"},
+    {"ticker": "B3SA3.SA", "nome": "B3", "setor": "Seguros e Financeiro"},
+
+    {"ticker": "MGLU3.SA", "nome": "Magazine Luiza", "setor": "Varejo"},
+    {"ticker": "LREN3.SA", "nome": "Lojas Renner", "setor": "Varejo"},
+    {"ticker": "PCAR3.SA", "nome": "Grupo Pao de Acucar", "setor": "Varejo"},
+    {"ticker": "ARZZ3.SA", "nome": "Arezzo", "setor": "Varejo"},
+    {"ticker": "VIVA3.SA", "nome": "Vivara", "setor": "Varejo"},
+
+    {"ticker": "ELET3.SA", "nome": "Eletrobras ON", "setor": "Energia Eletrica"},
+    {"ticker": "EQTL3.SA", "nome": "Equatorial Energia", "setor": "Energia Eletrica"},
+    {"ticker": "CPLE6.SA", "nome": "Copel PNB", "setor": "Energia Eletrica"},
+    {"ticker": "ENGI11.SA", "nome": "Energisa Units", "setor": "Energia Eletrica"},
+    {"ticker": "TAEE11.SA", "nome": "Taesa Units", "setor": "Energia Eletrica"},
+
+    {"ticker": "ABEV3.SA", "nome": "Ambev", "setor": "Alimentos e Bebidas"},
+    {"ticker": "JBSS3.SA", "nome": "JBS", "setor": "Alimentos e Bebidas"},
+    {"ticker": "BRFS3.SA", "nome": "BRF", "setor": "Alimentos e Bebidas"},
+    {"ticker": "MRFG3.SA", "nome": "Marfrig", "setor": "Alimentos e Bebidas"},
+    {"ticker": "SMTO3.SA", "nome": "Sao Martinho", "setor": "Alimentos e Bebidas"},
+
+    {"ticker": "RDOR3.SA", "nome": "Rede D'Or", "setor": "Saude"},
+    {"ticker": "HAPV3.SA", "nome": "Hapvida", "setor": "Saude"},
+    {"ticker": "FLRY3.SA", "nome": "Fleury", "setor": "Saude"},
+    {"ticker": "RADL3.SA", "nome": "Raia Drogasil", "setor": "Saude"},
+
+    {"ticker": "TOTS3.SA", "nome": "Totvs", "setor": "Tecnologia"},
+    {"ticker": "LWSA3.SA", "nome": "Locaweb", "setor": "Tecnologia"},
+    {"ticker": "POSI3.SA", "nome": "Positivo Tecnologia", "setor": "Tecnologia"},
+
+    {"ticker": "SUZB3.SA", "nome": "Suzano", "setor": "Papel e Celulose"},
+    {"ticker": "KLBN11.SA", "nome": "Klabin Units", "setor": "Papel e Celulose"},
+
+    {"ticker": "RAIL3.SA", "nome": "Rumo", "setor": "Transporte e Logistica"},
+    {"ticker": "CCRO3.SA", "nome": "CCR", "setor": "Transporte e Logistica"},
+    {"ticker": "RENT3.SA", "nome": "Localiza", "setor": "Transporte e Logistica"},
+    {"ticker": "STBP3.SA", "nome": "Santos Brasil", "setor": "Transporte e Logistica"},
+
+    {"ticker": "WEGE3.SA", "nome": "WEG", "setor": "Bens Industriais"},
+    {"ticker": "EMBR3.SA", "nome": "Embraer", "setor": "Bens Industriais"},
+    {"ticker": "RAPT4.SA", "nome": "Randon PN", "setor": "Bens Industriais"},
+
+    {"ticker": "CYRE3.SA", "nome": "Cyrela", "setor": "Construcao e Imobiliario"},
+    {"ticker": "MRVE3.SA", "nome": "MRV Engenharia", "setor": "Construcao e Imobiliario"},
+    {"ticker": "EZTC3.SA", "nome": "EZ Tec", "setor": "Construcao e Imobiliario"},
+
+    {"ticker": "VIVT3.SA", "nome": "Telefonica Brasil (Vivo)", "setor": "Telecomunicacoes"},
+    {"ticker": "TIMS3.SA", "nome": "TIM", "setor": "Telecomunicacoes"},
+
+    {"ticker": "SLCE3.SA", "nome": "SLC Agricola", "setor": "Agronegocio"},
+    {"ticker": "AGRO3.SA", "nome": "BrasilAgro", "setor": "Agronegocio"}
+  ]
+}
