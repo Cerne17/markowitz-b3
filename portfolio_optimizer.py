@@ -34,6 +34,83 @@ def _restricoes_base(n: int):
     return ({"type": "eq", "fun": lambda p: np.sum(p) - 1},)
 
 
+def downside_deviation_anual(retornos_diarios: pd.DataFrame, pesos: np.ndarray, taxa_livre_risco: float) -> float:
+    """Volatilidade so da parte ruim (abaixo da taxa livre de risco) - usada no indice de Sortino."""
+    rp = retornos_diarios.dot(pesos)
+    mar_diario = (1 + taxa_livre_risco) ** (1 / DIAS_UTEIS_ANO) - 1
+    downside = np.minimum(rp - mar_diario, 0)
+    return float(np.sqrt(np.mean(downside ** 2)) * np.sqrt(DIAS_UTEIS_ANO))
+
+
+def max_drawdown_portfolio(retornos_diarios: pd.DataFrame, pesos: np.ndarray) -> float:
+    """Maior queda historica (pico ao vale) da carteira com esses pesos, buy-and-hold. Numero negativo."""
+    rp = retornos_diarios.dot(pesos)
+    equity = (1 + rp).cumprod()
+    drawdown = equity / equity.cummax() - 1
+    return float(drawdown.min())
+
+
+def sortino_ratio(retorno_anual: float, downside_dev_anual: float, taxa_livre_risco: float) -> float:
+    return (retorno_anual - taxa_livre_risco) / downside_dev_anual if downside_dev_anual > 0 else 0.0
+
+
+def calmar_ratio(retorno_anual: float, max_drawdown: float) -> float:
+    return retorno_anual / abs(max_drawdown) if max_drawdown < 0 else 0.0
+
+
+def estatisticas_extras_portfolio(retornos_diarios: pd.DataFrame, pesos: np.ndarray,
+                                   retorno_anual: float, taxa_livre_risco: float) -> dict:
+    """Sortino, Calmar e max drawdown de uma carteira com pesos dados - complementa Sharpe/vol,
+    que so enxergam risco simetrico. Serve p/ qualquer estrategia, nao so as otimizadas p/ isso."""
+    if not np.any(pesos):
+        return {"sortino": 0.0, "calmar": 0.0, "max_drawdown": 0.0}
+    dd_anual = downside_deviation_anual(retornos_diarios, pesos, taxa_livre_risco)
+    mdd = max_drawdown_portfolio(retornos_diarios, pesos)
+    return {
+        "sortino": sortino_ratio(retorno_anual, dd_anual, taxa_livre_risco),
+        "calmar": calmar_ratio(retorno_anual, mdd),
+        "max_drawdown": mdd,
+    }
+
+
+def otimiza_max_sortino(media_anual: pd.Series, cov_anual: pd.DataFrame, retornos_diarios: pd.DataFrame,
+                         taxa_livre_risco: float, peso_maximo_por_ativo: float = 1.0) -> Portfolio:
+    """Maximiza o indice de Sortino (retorno-rf)/downside deviation, em vez de dividir pela vol inteira
+    como o Sharpe - penaliza so a variancia "ruim" (abaixo da taxa livre), nao a boa tambem."""
+    n = len(media_anual)
+
+    def neg_sortino(pesos):
+        retorno = float(np.dot(pesos, media_anual))
+        dd = downside_deviation_anual(retornos_diarios, pesos, taxa_livre_risco)
+        return -sortino_ratio(retorno, dd, taxa_livre_risco)
+
+    chute = np.repeat(1 / n, n)
+    limites = tuple((0.0, peso_maximo_por_ativo) for _ in range(n))
+    resultado = minimize(neg_sortino, chute, method="SLSQP", bounds=limites, constraints=_restricoes_base(n))
+    return desempenho_portfolio(resultado.x, media_anual, cov_anual, taxa_livre_risco)
+
+
+def otimiza_max_calmar(media_anual: pd.Series, cov_anual: pd.DataFrame, retornos_diarios: pd.DataFrame,
+                        taxa_livre_risco: float, peso_maximo_por_ativo: float = 1.0) -> Portfolio:
+    """Maximiza o indice de Calmar (retorno anual / maior drawdown historico).
+
+    Drawdown e uma funcao "quebrada" dos pesos (o pior dia pode mudar abruptamente com um
+    pequeno ajuste), entao o gradiente numerico do SLSQP e mais ruidoso aqui que em Sharpe/
+    Sortino/Vol - pode nao achar o otimo global perfeito, mas converge numa carteira razoavel.
+    """
+    n = len(media_anual)
+
+    def neg_calmar(pesos):
+        retorno = float(np.dot(pesos, media_anual))
+        mdd = max_drawdown_portfolio(retornos_diarios, pesos)
+        return -calmar_ratio(retorno, mdd)
+
+    chute = np.repeat(1 / n, n)
+    limites = tuple((0.0, peso_maximo_por_ativo) for _ in range(n))
+    resultado = minimize(neg_calmar, chute, method="SLSQP", bounds=limites, constraints=_restricoes_base(n))
+    return desempenho_portfolio(resultado.x, media_anual, cov_anual, taxa_livre_risco)
+
+
 def otimiza_max_sharpe(media_anual: pd.Series, cov_anual: pd.DataFrame, taxa_livre_risco: float,
                         peso_maximo_por_ativo: float = 1.0) -> Portfolio:
     n = len(media_anual)

@@ -552,18 +552,20 @@ class App(ctk.CTk):
         self.tabview.set("Resumo")
 
     def _monta_tab_resumo(self):
-        self.tab_resumo.grid_columnconfigure((0, 1, 2), weight=1)
+        self.tab_resumo.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
         self.card_atual = self._cria_card(self.tab_resumo, "Carteira Atual", 0, linha=0)
         self.card_max_sharpe = self._cria_card(self.tab_resumo, "Referencia: Max Sharpe", 1, linha=0)
         self.card_min_vol = self._cria_card(self.tab_resumo, "Referencia: Min Volatilidade", 2, linha=0)
+        self.card_max_sortino = self._cria_card(self.tab_resumo, "Referencia: Max Sortino", 3, linha=0)
         self.card_equal_weight = self._cria_card(self.tab_resumo, "Referencia: Equal Weight (1/N)", 0, linha=1)
         self.card_risk_parity = self._cria_card(self.tab_resumo, "Referencia: Risk Parity", 1, linha=1)
-        self.card_escolhida = self._cria_card(self.tab_resumo, "Alvo Escolhido na Fronteira", 2, linha=1,
+        self.card_max_calmar = self._cria_card(self.tab_resumo, "Referencia: Max Calmar", 2, linha=1)
+        self.card_escolhida = self._cria_card(self.tab_resumo, "Alvo Escolhido na Fronteira", 3, linha=1,
                                                destaque=True)
 
         linha_titulo = ctk.CTkFrame(self.tab_resumo, fg_color="transparent")
-        linha_titulo.grid(row=2, column=0, columnspan=3, sticky="we", padx=16, pady=(18, 4))
+        linha_titulo.grid(row=2, column=0, columnspan=4, sticky="we", padx=16, pady=(18, 4))
         linha_titulo.grid_columnconfigure(0, weight=1)
 
         self.label_titulo_rebalanceamento = ctk.CTkLabel(
@@ -601,7 +603,7 @@ class App(ctk.CTk):
             self.tabela_rebalanceamento.column(c, anchor="center", width=larguras.get(c, 120))
         self.tabela_rebalanceamento.tag_configure("comprar", foreground=POSITIVO)
         self.tabela_rebalanceamento.tag_configure("vender", foreground=NEGATIVO)
-        self.tabela_rebalanceamento.grid(row=3, column=0, columnspan=3, sticky="nswe", padx=16, pady=6)
+        self.tabela_rebalanceamento.grid(row=3, column=0, columnspan=4, sticky="nswe", padx=16, pady=6)
         self.tab_resumo.grid_rowconfigure(3, weight=1)
 
         self.label_nota_ir = ctk.CTkLabel(
@@ -611,12 +613,12 @@ class App(ctk.CTk):
                   "calcula o ganho de capital real (o app nao rastreia seu preco medio de compra), so "
                   "indica a aliquota/isencao que se aplicaria na venda. Consulte um contador antes de decidir."),
             font=ctk.CTkFont(size=10), text_color=TEXT_MUTED, wraplength=900, justify="left")
-        self.label_nota_ir.grid(row=4, column=0, columnspan=3, sticky="w", padx=16, pady=(0, 6))
+        self.label_nota_ir.grid(row=4, column=0, columnspan=4, sticky="w", padx=16, pady=(0, 6))
 
         self.label_renda_passiva = ctk.CTkLabel(
             self.tab_resumo, text="", font=ctk.CTkFont(size=13, weight="bold"), text_color=SAPWOOD,
             justify="left", wraplength=900)
-        self.label_renda_passiva.grid(row=5, column=0, columnspan=3, sticky="w", padx=16, pady=(0, 14))
+        self.label_renda_passiva.grid(row=5, column=0, columnspan=4, sticky="w", padx=16, pady=(0, 14))
 
     def _cria_card(self, master, titulo, coluna, linha=0, destaque=False):
         card = ctk.CTkFrame(master, fg_color=SURFACE_2,
@@ -768,6 +770,8 @@ class App(ctk.CTk):
             carteira_min_vol = opt.otimiza_min_volatilidade(media_anual, cov_anual, taxa_livre, peso_maximo)
             carteira_equal_weight = opt.portfolio_equal_weight(media_anual, cov_anual, taxa_livre)
             carteira_risk_parity = opt.otimiza_risk_parity(media_anual, cov_anual, taxa_livre, peso_maximo)
+            carteira_max_sortino = opt.otimiza_max_sortino(media_anual, cov_anual, retornos, taxa_livre, peso_maximo)
+            carteira_max_calmar = opt.otimiza_max_calmar(media_anual, cov_anual, retornos, taxa_livre, peso_maximo)
             fronteira = opt.fronteira_eficiente(media_anual, cov_anual, taxa_livre, peso_maximo_por_ativo=peso_maximo)
             simulacoes = opt.simula_portfolios_aleatorios(
                 media_anual, cov_anual, taxa_livre, n_simulacoes=cfg["num_portfolios_simulados"])
@@ -789,6 +793,8 @@ class App(ctk.CTk):
                 "carteira_min_vol": carteira_min_vol,
                 "carteira_equal_weight": carteira_equal_weight,
                 "carteira_risk_parity": carteira_risk_parity,
+                "carteira_max_sortino": carteira_max_sortino,
+                "carteira_max_calmar": carteira_max_calmar,
                 "fronteira": fronteira,
                 "simulacoes": simulacoes,
                 "correlacao": correlacao,
@@ -842,6 +848,7 @@ class App(ctk.CTk):
         self.pontos_candidatos = list(r["fronteira"]) + [
             r["carteira_max_sharpe"], r["carteira_min_vol"],
             r["carteira_equal_weight"], r["carteira_risk_parity"],
+            r["carteira_max_sortino"], r["carteira_max_calmar"],
         ]
 
         self._atualiza_cards(r)
@@ -850,10 +857,17 @@ class App(ctk.CTk):
         self._desenha_correlacao_e_retornos(r)
 
     def _atualiza_cards(self, r: dict):
+        retornos = r["retornos_diarios"]
+        taxa_livre = r["taxa_livre"]
+
         def texto(p, pesos_tickers=None):
+            extras = opt.estatisticas_extras_portfolio(retornos, p.pesos, p.retorno_esperado, taxa_livre)
             base = (f"Retorno esperado: {p.retorno_esperado * 100:.2f}% a.a.\n"
                     f"Volatilidade: {p.volatilidade * 100:.2f}% a.a.\n"
-                    f"Indice de Sharpe: {p.sharpe:.3f}")
+                    f"Indice de Sharpe: {p.sharpe:.3f}\n"
+                    f"Indice de Sortino: {extras['sortino']:.3f}\n"
+                    f"Indice de Calmar: {extras['calmar']:.3f}\n"
+                    f"Max drawdown: {extras['max_drawdown'] * 100:.1f}%")
             if pesos_tickers:
                 pesos_txt = "\n".join(f"  {t}: {w * 100:.1f}%" for t, w in pesos_tickers)
                 base += f"\n\nPesos:\n{pesos_txt}"
@@ -869,6 +883,10 @@ class App(ctk.CTk):
             text=texto(r["carteira_equal_weight"], list(zip(tickers, r["carteira_equal_weight"].pesos))))
         self.card_risk_parity.label_valores.configure(
             text=texto(r["carteira_risk_parity"], list(zip(tickers, r["carteira_risk_parity"].pesos))))
+        self.card_max_sortino.label_valores.configure(
+            text=texto(r["carteira_max_sortino"], list(zip(tickers, r["carteira_max_sortino"].pesos))))
+        self.card_max_calmar.label_valores.configure(
+            text=texto(r["carteira_max_calmar"], list(zip(tickers, r["carteira_max_calmar"].pesos))))
         self._texto_portfolio = texto  # reutilizado por _atualiza_escolhida
 
     # ---------- selecao interativa na fronteira ----------
@@ -1042,6 +1060,8 @@ class App(ctk.CTk):
         mv = r["carteira_min_vol"]
         ew = r["carteira_equal_weight"]
         rp = r["carteira_risk_parity"]
+        sortino = r["carteira_max_sortino"]
+        calmar = r["carteira_max_calmar"]
         atual = r["carteira_atual"]
         ax.scatter([ms.volatilidade * 100], [ms.retorno_esperado * 100], color=HEARTWOOD, marker="*",
                    s=240, label="Max Sharpe", zorder=5, edgecolors=INK, linewidths=0.5)
@@ -1051,6 +1071,10 @@ class App(ctk.CTk):
                    s=110, label="Equal Weight (1/N)", zorder=5, edgecolors=INK, linewidths=0.5)
         ax.scatter([rp.volatilidade * 100], [rp.retorno_esperado * 100], color="#1FA79E", marker="^",
                    s=130, label="Risk Parity", zorder=5, edgecolors=INK, linewidths=0.5)
+        ax.scatter([sortino.volatilidade * 100], [sortino.retorno_esperado * 100], color="#D1487E", marker="P",
+                   s=140, label="Max Sortino", zorder=5, edgecolors=INK, linewidths=0.5)
+        ax.scatter([calmar.volatilidade * 100], [calmar.retorno_esperado * 100], color="#A68A1F", marker="X",
+                   s=140, label="Max Calmar", zorder=5, edgecolors=INK, linewidths=0.5)
         ax.scatter([atual.volatilidade * 100], [atual.retorno_esperado * 100], color="#4A90D9", marker="D",
                    s=100, label="Carteira atual", zorder=5, edgecolors=INK, linewidths=0.5)
 
