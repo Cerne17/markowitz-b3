@@ -55,6 +55,9 @@ def cor_ativo(indice: int) -> str:
     return PALETA_CATEGORICA[indice % len(PALETA_CATEGORICA)]
 
 
+MAPA_CLASSE = {"Acoes": "Acao", "ETFs": "ETF", "FIIs": "FII"}
+
+
 # larguras fixas compartilhadas entre o cabecalho e cada LinhaAtivo, p/ colunas alinhadas
 LARGURA_COL_TICKER = 78
 LARGURA_COL_VALOR = 104
@@ -145,22 +148,33 @@ class App(ctk.CTk):
                       text_color=TEXT, command=self._adiciona_linha_vazia).pack(
             fill="x", padx=14, pady=(4, 12))
 
+        ctk.CTkLabel(painel, text="Aporte disponivel agora (R$) - opcional", text_color=TEXT_MUTED).pack(
+            anchor="w", padx=14)
+        self.entry_aporte = ctk.CTkEntry(painel, fg_color=SURFACE_2, border_color=TEXT_MUTED, border_width=1,
+                                          text_color=TEXT, placeholder_text="0,00")
+        self.entry_aporte.pack(fill="x", padx=14, pady=(0, 10))
+        self.entry_aporte.bind("<KeyRelease>", lambda e: self._recalcula_tabela_rebalanceamento())
+
         ctk.CTkLabel(painel, text="Data inicio (AAAA-MM-DD)", text_color=TEXT_MUTED).pack(anchor="w", padx=14)
-        self.entry_data_inicio = ctk.CTkEntry(painel, fg_color=SURFACE_2, border_color=SURFACE_2, text_color=TEXT)
+        self.entry_data_inicio = ctk.CTkEntry(painel, fg_color=SURFACE_2, border_color=TEXT_MUTED, border_width=1,
+                                               text_color=TEXT)
         self.entry_data_inicio.pack(fill="x", padx=14, pady=(0, 10))
 
         ctk.CTkLabel(painel, text="Taxa livre de risco anual (%)", text_color=TEXT_MUTED).pack(anchor="w", padx=14)
-        self.entry_taxa_livre = ctk.CTkEntry(painel, fg_color=SURFACE_2, border_color=SURFACE_2, text_color=TEXT)
+        self.entry_taxa_livre = ctk.CTkEntry(painel, fg_color=SURFACE_2, border_color=TEXT_MUTED, border_width=1,
+                                              text_color=TEXT)
         self.entry_taxa_livre.pack(fill="x", padx=14, pady=(0, 10))
 
         ctk.CTkLabel(painel, text="Simulacoes de portfolio (fronteira)", text_color=TEXT_MUTED).pack(
             anchor="w", padx=14)
-        self.entry_num_sim = ctk.CTkEntry(painel, fg_color=SURFACE_2, border_color=SURFACE_2, text_color=TEXT)
+        self.entry_num_sim = ctk.CTkEntry(painel, fg_color=SURFACE_2, border_color=TEXT_MUTED, border_width=1,
+                                           text_color=TEXT)
         self.entry_num_sim.pack(fill="x", padx=14, pady=(0, 10))
 
         ctk.CTkLabel(painel, text="Peso maximo por ativo (%) - evita concentracao total",
                      text_color=TEXT_MUTED, wraplength=300, justify="left").pack(anchor="w", padx=14)
-        self.entry_peso_maximo = ctk.CTkEntry(painel, fg_color=SURFACE_2, border_color=SURFACE_2, text_color=TEXT)
+        self.entry_peso_maximo = ctk.CTkEntry(painel, fg_color=SURFACE_2, border_color=TEXT_MUTED, border_width=1,
+                                               text_color=TEXT)
         self.entry_peso_maximo.pack(fill="x", padx=14, pady=(0, 14))
 
         self.btn_calcular = ctk.CTkButton(painel, text="Calcular alocacao otima", height=42,
@@ -206,8 +220,17 @@ class App(ctk.CTk):
         ctk.CTkLabel(painel, text="Buscar Ativos", font=ctk.CTkFont(size=16, weight="bold"),
                      text_color=TEXT).pack(anchor="w", padx=12, pady=(12, 6))
 
-        setores = ["Todos"] + sorted({a["setor"] for a in self.universo_ativos})
-        self.opcao_setor = ctk.CTkOptionMenu(painel, values=setores, fg_color=SURFACE,
+        classes = ["Todas"] + [c for c in ("Acoes", "ETFs", "FIIs")
+                                if MAPA_CLASSE[c] in {a["classe"] for a in self.universo_ativos}]
+        self.opcao_classe = ctk.CTkOptionMenu(painel, values=classes, fg_color=SURFACE,
+                                               button_color=HEARTWOOD, button_hover_color=HEARTWOOD_GLOW,
+                                               text_color=TEXT, dropdown_fg_color=SURFACE,
+                                               dropdown_text_color=TEXT,
+                                               command=lambda _: self._on_muda_classe())
+        self.opcao_classe.set("Todas")
+        self.opcao_classe.pack(fill="x", padx=12, pady=(0, 8))
+
+        self.opcao_setor = ctk.CTkOptionMenu(painel, values=["Todos"], fg_color=SURFACE,
                                               button_color=HEARTWOOD, button_hover_color=HEARTWOOD_GLOW,
                                               text_color=TEXT, dropdown_fg_color=SURFACE,
                                               dropdown_text_color=TEXT,
@@ -216,9 +239,20 @@ class App(ctk.CTk):
         self.opcao_setor.pack(fill="x", padx=12, pady=(0, 8))
 
         self.entry_busca = ctk.CTkEntry(painel, placeholder_text="Nome ou ticker...", fg_color=SURFACE,
-                                         border_color=SURFACE, text_color=TEXT, placeholder_text_color=TEXT_MUTED)
+                                         border_color=TEXT_MUTED, border_width=1,
+                                         text_color=TEXT, placeholder_text_color=TEXT_MUTED)
         self.entry_busca.pack(fill="x", padx=12, pady=(0, 8))
         self.entry_busca.bind("<KeyRelease>", lambda e: self._filtra_lista_ativos())
+
+        ctk.CTkLabel(painel, text="Horizonte (grafico e metricas)", font=ctk.CTkFont(size=11),
+                     text_color=TEXT_MUTED).pack(anchor="w", padx=12)
+        self.opcao_horizonte = ctk.CTkOptionMenu(painel, values=list(dfx.HORIZONTES_EXPLORAR.keys()),
+                                                  fg_color=SURFACE, button_color=HEARTWOOD,
+                                                  button_hover_color=HEARTWOOD_GLOW, text_color=TEXT,
+                                                  dropdown_fg_color=SURFACE, dropdown_text_color=TEXT,
+                                                  command=lambda _: self._on_muda_horizonte())
+        self.opcao_horizonte.set("2 anos")
+        self.opcao_horizonte.pack(fill="x", padx=12, pady=(0, 8))
 
         self.frame_lista_ativos = ctk.CTkScrollableFrame(painel, fg_color=SURFACE)
         self.frame_lista_ativos.pack(fill="both", expand=True, padx=12, pady=(0, 12))
@@ -250,7 +284,7 @@ class App(ctk.CTk):
         linha_add.grid(row=4, column=0, sticky="we", padx=16, pady=(0, 16))
         ctk.CTkLabel(linha_add, text="Valor a investir (R$)", text_color=TEXT_MUTED).pack(side="left", padx=(0, 8))
         self.entry_valor_novo_ativo = ctk.CTkEntry(linha_add, width=140, fg_color=SURFACE,
-                                                     border_color=SURFACE, text_color=TEXT)
+                                                     border_color=TEXT_MUTED, border_width=1, text_color=TEXT)
         self.entry_valor_novo_ativo.insert(0, "1000.00")
         self.entry_valor_novo_ativo.pack(side="left", padx=(0, 8))
         self.btn_adicionar_ativo = ctk.CTkButton(linha_add, text="+ Adicionar ao Portfolio",
@@ -261,11 +295,25 @@ class App(ctk.CTk):
 
         self._filtra_lista_ativos()
 
+    def _on_muda_classe(self):
+        classe_label = self.opcao_classe.get()
+        classe = MAPA_CLASSE.get(classe_label)
+        if classe is None:
+            setores = sorted({a["setor"] for a in self.universo_ativos})
+        else:
+            setores = sorted({a["setor"] for a in self.universo_ativos if a["classe"] == classe})
+        self.opcao_setor.configure(values=["Todos"] + setores)
+        self.opcao_setor.set("Todos")
+        self._filtra_lista_ativos()
+
     def _filtra_lista_ativos(self):
+        classe = MAPA_CLASSE.get(self.opcao_classe.get())
         setor = self.opcao_setor.get()
         termo = self.entry_busca.get().strip().lower()
         resultado = []
         for a in self.universo_ativos:
+            if classe is not None and a["classe"] != classe:
+                continue
             if setor != "Todos" and a["setor"] != setor:
                 continue
             if termo and termo not in a["nome"].lower() and termo not in a["ticker"].lower():
@@ -281,11 +329,16 @@ class App(ctk.CTk):
                          text_color=TEXT_MUTED).pack(pady=8)
             return
         for a in lista:
-            texto = f"{a['ticker'].replace('.SA', '')} · {a['nome']}"
+            prefixo = "" if a["classe"] == "Acao" else f"[{a['classe']}] "
+            texto = f"{prefixo}{a['ticker'].replace('.SA', '')} · {a['nome']}"
             btn = ctk.CTkButton(self.frame_lista_ativos, text=texto, anchor="w",
                                  fg_color=SURFACE_2, hover_color=HEARTWOOD, text_color=TEXT,
                                  command=lambda a=a: self._selecionar_ativo_explorar(a))
             btn.pack(fill="x", pady=2)
+
+    def _on_muda_horizonte(self):
+        if self.ativo_selecionado_explorar is not None:
+            self._selecionar_ativo_explorar(self.ativo_selecionado_explorar)
 
     def _selecionar_ativo_explorar(self, ativo: dict):
         self.ativo_selecionado_explorar = ativo
@@ -301,7 +354,7 @@ class App(ctk.CTk):
 
     def _worker_analise_ativo(self, ativo: dict):
         try:
-            data_inicio = self.entry_data_inicio.get().strip() or "2021-01-01"
+            data_inicio = dfx.data_inicio_por_horizonte(self.opcao_horizonte.get())
             taxa_livre = float(self.entry_taxa_livre.get().strip().replace(",", ".")) / 100
             precos = dfx.baixar_precos([ativo["ticker"]], data_inicio)
             serie = precos[ativo["ticker"]]
@@ -320,11 +373,18 @@ class App(ctk.CTk):
             industria = f" / {info['industria']}" if info.get("industria") else ""
             linhas_info.append(f"Setor (Yahoo): {info['setor']}{industria}")
         if info.get("market_cap"):
-            linhas_info.append(f"Valor de mercado: R$ {info['market_cap'] / 1e9:.1f} bi")
+            linhas_info.append(f"TAM (valor de mercado): R$ {info['market_cap'] / 1e9:.2f} bi")
+        if info.get("price_to_book") is not None:
+            linhas_info.append(f"P/VP: {info['price_to_book']:.2f}")
         if info.get("dividend_yield") is not None:
             linhas_info.append(f"Dividend yield: {info['dividend_yield']:.2f}%")
+        if info.get("capex_recente") is not None:
+            linhas_info.append(f"Capex mais recente ({info.get('capex_data', 'n/d')}): "
+                                f"R$ {abs(info['capex_recente']) / 1e6:.1f} mi")
         if info.get("minima_52_sem") and info.get("maxima_52_sem"):
             linhas_info.append(f"Faixa 52 semanas: R$ {info['minima_52_sem']:.2f} - R$ {info['maxima_52_sem']:.2f}")
+        if not info.get("market_cap") and not info.get("price_to_book"):
+            linhas_info.append("TAM/P-VP nao disponiveis p/ esta classe de ativo (comum p/ ETFs).")
         self.label_info_ativo.configure(text="\n".join(linhas_info) or "Sem dados fundamentalistas disponiveis.")
 
         texto_stats = (
@@ -344,7 +404,7 @@ class App(ctk.CTk):
         ax = fig.add_subplot(111)
         self._estiliza_eixos(ax)
         ax.plot(serie.index, serie.values, color=HEARTWOOD, linewidth=1.4)
-        ax.set_title(f"Preco - {ticker} (Buy and Hold)", color=TEXT)
+        ax.set_title(f"Preco - {ticker} (Buy and Hold) - {self.opcao_horizonte.get()}", color=TEXT)
         ax.set_ylabel("R$")
         fig.tight_layout()
         self.canvas_explorar.draw()
@@ -439,6 +499,7 @@ class App(ctk.CTk):
         self.entry_taxa_livre.insert(0, f"{cfg['taxa_livre_risco_anual'] * 100:.2f}")
         self.entry_num_sim.insert(0, str(cfg["num_portfolios_simulados"]))
         self.entry_peso_maximo.insert(0, f"{cfg.get('peso_maximo_por_ativo', 1.0) * 100:.0f}")
+        self.entry_aporte.insert(0, f"{cfg.get('aporte_disponivel', 0.0):.2f}")
 
     def _adiciona_linha(self, ticker="", valor=1000.0):
         linha = LinhaAtivo(self.frame_ativos, ticker, valor, self._remove_linha)
@@ -479,6 +540,10 @@ class App(ctk.CTk):
         taxa_livre = float(self.entry_taxa_livre.get().strip().replace(",", ".")) / 100
         num_sim = int(self.entry_num_sim.get().strip())
         peso_maximo = float(self.entry_peso_maximo.get().strip().replace(",", ".")) / 100
+        aporte_txt = self.entry_aporte.get().strip().replace(",", ".")
+        aporte = float(aporte_txt) if aporte_txt else 0.0
+        if aporte < 0:
+            raise ValueError("Aporte disponivel nao pode ser negativo.")
 
         if not (1 / len(ativos) - 1e-9 <= peso_maximo <= 1.0):
             raise ValueError(
@@ -491,6 +556,7 @@ class App(ctk.CTk):
             "taxa_livre_risco_anual": taxa_livre,
             "num_portfolios_simulados": num_sim,
             "peso_maximo_por_ativo": peso_maximo,
+            "aporte_disponivel": aporte,
         }
 
     # ---------- calculo ----------
@@ -607,6 +673,14 @@ class App(ctk.CTk):
         self.escolhida = self.pontos_fronteira[melhor_idx]
         self._atualiza_escolhida()
 
+    def _ler_aporte(self) -> float:
+        txt = self.entry_aporte.get().strip().replace(",", ".")
+        try:
+            valor = float(txt) if txt else 0.0
+        except ValueError:
+            valor = 0.0
+        return max(valor, 0.0)
+
     def _atualiza_escolhida(self):
         if self.resultado is None or self.escolhida is None:
             return
@@ -616,9 +690,23 @@ class App(ctk.CTk):
         self.card_escolhida.label_valores.configure(
             text=self._texto_portfolio(self.escolhida, list(zip(tickers, self.escolhida.pesos))))
 
-        rebalanceamento = opt.sugestao_rebalanceamento(tickers, r["valores"], self.escolhida.pesos)
-        self._atualiza_tabela_rebalanceamento(rebalanceamento)
+        self._recalcula_tabela_rebalanceamento()
         self._desenha_fronteira(r)
+
+    def _recalcula_tabela_rebalanceamento(self):
+        if self.resultado is None or self.escolhida is None:
+            return
+        r = self.resultado
+        aporte = self._ler_aporte()
+        total = sum(r["valores"]) + aporte
+
+        rebalanceamento = opt.sugestao_rebalanceamento(r["tickers"], r["valores"], self.escolhida.pesos, aporte)
+        self._atualiza_tabela_rebalanceamento(rebalanceamento)
+
+        self.label_titulo_rebalanceamento.configure(
+            text=(f"Sugestao de rebalanceamento - carteira atual (R$ {sum(r['valores']):.2f}) "
+                  f"+ aporte (R$ {aporte:.2f}) = total R$ {total:.2f}. "
+                  "Clique num ponto da Fronteira Eficiente p/ mudar o alvo."))
 
     def _atualiza_tabela_rebalanceamento(self, df):
         for item in self.tabela_rebalanceamento.get_children():

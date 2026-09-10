@@ -27,10 +27,18 @@
     {
       "ticker": "EMBJ3.SA",
       "valor_investido": 1000.0
+    },
+    {
+      "ticker": "MXRF11.SA",
+      "valor_investido": 1000.0
+    },
+    {
+      "ticker": "IVVB11.SA",
+      "valor_investido": 1000.0
     }
   ],
-  "data_inicio": "2021-01-01",
+  "data_inicio": "2023-01-01",
   "taxa_livre_risco_anual": 0.14,
   "num_portfolios_simulados": 8000,
-  "peso_maximo_por_ativo": 0.35
+  "peso_maximo_por_ativo": 0.4
 }

@@ -124,14 +124,17 @@ def pesos_atuais(valores_investidos: list[float]) -> np.ndarray:
     return np.array([v / total for v in valores_investidos])
 
 
-def sugestao_rebalanceamento(tickers: list[str], valores_atuais: list[float], pesos_alvo: np.ndarray) -> pd.DataFrame:
-    total = sum(valores_atuais)
-    valores_alvo = pesos_alvo * total
+def sugestao_rebalanceamento(tickers: list[str], valores_atuais: list[float], pesos_alvo: np.ndarray,
+                              aporte: float = 0.0) -> pd.DataFrame:
+    """Ajuste sugerido por ativo considerando a carteira atual + um aporte novo a investir agora."""
+    total_atual = sum(valores_atuais)
+    total_com_aporte = total_atual + aporte
+    valores_alvo = pesos_alvo * total_com_aporte
     diffs = valores_alvo - np.array(valores_atuais)
     return pd.DataFrame({
         "ticker": tickers,
         "valor_atual": valores_atuais,
-        "peso_atual": np.array(valores_atuais) / total,
+        "peso_atual": np.array(valores_atuais) / total_atual,
         "peso_alvo": pesos_alvo,
         "valor_alvo": valores_alvo,
         "ajuste": diffs,
