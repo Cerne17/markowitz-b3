@@ -60,6 +60,38 @@ def otimiza_min_volatilidade(media_anual: pd.Series, cov_anual: pd.DataFrame, ta
     return desempenho_portfolio(resultado.x, media_anual, cov_anual, taxa_livre_risco)
 
 
+def portfolio_equal_weight(media_anual: pd.Series, cov_anual: pd.DataFrame, taxa_livre_risco: float) -> Portfolio:
+    """Estrategia classica 1/N: mesmo peso p/ todo ativo, sem otimizacao nenhuma.
+
+    Referencia classica da literatura (DeMiguel, Garlappi & Uppal 2009): em varios estudos
+    empiricos o 1/N supera carteiras "otimizadas" fora da amostra, por nao depender de
+    estimativas de retorno esperado (que sao ruidosas). Bom baseline p/ comparar.
+    """
+    n = len(media_anual)
+    pesos = np.repeat(1 / n, n)
+    return desempenho_portfolio(pesos, media_anual, cov_anual, taxa_livre_risco)
+
+
+def otimiza_risk_parity(media_anual: pd.Series, cov_anual: pd.DataFrame, taxa_livre_risco: float,
+                         peso_maximo_por_ativo: float = 1.0) -> Portfolio:
+    """Risk Parity (Equal Risk Contribution): pesos tais que cada ativo contribua igualmente
+    para a variancia total da carteira, em vez de pesos iguais em R$ (1/N) ou otimizados por
+    retorno esperado (Max Sharpe). Nao usa media_anual na otimizacao - so a matriz de
+    covariancia -, o que a torna menos sensivel a erro de estimativa de retorno.
+    """
+    n = len(media_anual)
+
+    def dispersao_contribuicoes(pesos):
+        rc = contribuicao_risco(pesos, cov_anual)
+        return float(np.sum((rc - 1 / n) ** 2))
+
+    chute = np.repeat(1 / n, n)
+    limites = tuple((1e-6, peso_maximo_por_ativo) for _ in range(n))  # >0 p/ contribuicao_risco nao zerar
+    resultado = minimize(dispersao_contribuicoes, chute, method="SLSQP", bounds=limites,
+                          constraints=_restricoes_base(n))
+    return desempenho_portfolio(resultado.x, media_anual, cov_anual, taxa_livre_risco)
+
+
 def fronteira_eficiente(media_anual: pd.Series, cov_anual: pd.DataFrame, taxa_livre_risco: float,
                          n_pontos: int = 50, peso_maximo_por_ativo: float = 1.0) -> list[Portfolio]:
     n = len(media_anual)
