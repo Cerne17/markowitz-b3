@@ -761,21 +761,30 @@ class App(ctk.CTk):
         try:
             tipo, payload = self.fila.get_nowait()
         except queue.Empty:
-            pass
-        else:
-            if tipo == "erro":
+            tipo = None
+
+        if tipo is not None:
+            try:
+                if tipo == "erro":
+                    self.btn_calcular.configure(state="normal", text="Calcular alocacao otima")
+                    self.label_status.configure(text=f"Erro: {payload}", text_color=NEGATIVO)
+                    messagebox.showerror("Erro ao calcular", payload)
+                elif tipo == "ok":
+                    self.btn_calcular.configure(state="normal", text="Calcular alocacao otima")
+                    self.label_status.configure(
+                        text="Calculo concluido. Clique na fronteira p/ escolher o alvo.", text_color=POSITIVO)
+                    self._atualiza_ui(payload)
+                elif tipo == "ativo_erro":
+                    self.label_info_ativo.configure(text=f"Erro ao carregar: {payload}")
+                elif tipo == "ativo_ok":
+                    self._atualiza_analise_ativo(payload)
+            except Exception as e:
+                # Nunca deixar uma falha ao atualizar a tela travar o polling da fila
+                # (senao o app fica preso em "Calculando..." pra sempre).
                 self.btn_calcular.configure(state="normal", text="Calcular alocacao otima")
-                self.label_status.configure(text=f"Erro: {payload}", text_color=NEGATIVO)
-                messagebox.showerror("Erro ao calcular", payload)
-            elif tipo == "ok":
-                self.btn_calcular.configure(state="normal", text="Calcular alocacao otima")
-                self.label_status.configure(text="Calculo concluido. Clique na fronteira p/ escolher o alvo.",
-                                             text_color=POSITIVO)
-                self._atualiza_ui(payload)
-            elif tipo == "ativo_erro":
-                self.label_info_ativo.configure(text=f"Erro ao carregar: {payload}")
-            elif tipo == "ativo_ok":
-                self._atualiza_analise_ativo(payload)
+                self.label_status.configure(text=f"Erro ao atualizar a tela: {e}", text_color=NEGATIVO)
+                messagebox.showerror("Erro inesperado ao atualizar a tela", str(e))
+
         self.after(150, self._processa_fila)
 
     # ---------- atualizacao visual ----------
@@ -965,8 +974,17 @@ class App(ctk.CTk):
         def formata_pct(valor):
             return f"{valor:.1f}%" if valor >= 1.5 else ""
 
-        wedges1, _, _ = ax1.pie(r["carteira_atual"].pesos, autopct=formata_pct, colors=cores,
-                                 textprops={"color": INK, "fontweight": "bold"})
+        pesos_atuais = r["carteira_atual"].pesos
+        if pesos_atuais.sum() > 0:
+            ax1.pie(pesos_atuais, autopct=formata_pct, colors=cores,
+                    textprops={"color": INK, "fontweight": "bold"})
+        else:
+            ax1.set_facecolor(SURFACE)
+            ax1.text(0.5, 0.5, "Sem posicao atual\n(carteira vazia - so aporte)",
+                     ha="center", va="center", color=TEXT_MUTED, fontsize=11, wrap=True)
+            ax1.set_xlim(0, 1)
+            ax1.set_ylim(0, 1)
+            ax1.axis("off")
         ax1.set_title("Carteira Atual", color=TEXT)
 
         alvo = self.escolhida if self.escolhida is not None else r["carteira_max_sharpe"]

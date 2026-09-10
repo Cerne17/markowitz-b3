@@ -32,6 +32,6 @@
   "data_inicio": "2022-01-01",
   "taxa_livre_risco_anual": 0.14,
   "num_portfolios_simulados": 50000,
-  "peso_maximo_por_ativo": 0.2,
+  "peso_maximo_por_ativo": 0.3,
   "aporte_disponivel": 1000.0
 }
