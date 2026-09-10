@@ -107,6 +107,7 @@ class App(ctk.CTk):
         self.escolhida: opt.Portfolio | None = None
         self.universo_ativos = dfx.carrega_universo_ativos()
         self.ativo_selecionado_explorar: dict | None = None
+        self._info_ativo_atual: dict = {}
 
         self._monta_layout()
         self._carrega_config_na_ui()
@@ -121,9 +122,12 @@ class App(ctk.CTk):
         self._monta_area_direita()
 
     def _monta_painel_esquerdo(self):
-        painel = ctk.CTkFrame(self, width=340, fg_color=SURFACE)
+        # CTkScrollableFrame p/ o painel inteiro rolar quando a janela for baixa demais
+        # p/ caber tudo (ex: botao "Calcular" ficando escondido sem como rolar ate ele).
+        painel = ctk.CTkScrollableFrame(self, width=340, fg_color=SURFACE,
+                                         scrollbar_button_color=SURFACE_2,
+                                         scrollbar_button_hover_color=HEARTWOOD)
         painel.grid(row=0, column=0, sticky="nswe", padx=(12, 6), pady=12)
-        painel.grid_propagate(False)
 
         ctk.CTkLabel(painel, text="Minha Carteira", font=ctk.CTkFont(size=18, weight="bold"),
                      text_color=TEXT).pack(anchor="w", padx=14, pady=(14, 2))
@@ -141,8 +145,8 @@ class App(ctk.CTk):
             row=0, column=1, padx=4)
         ctk.CTkLabel(cabecalho, text="", width=LARGURA_COL_REMOVER).grid(row=0, column=2, padx=(4, 0))
 
-        self.frame_ativos = ctk.CTkScrollableFrame(painel, height=320, fg_color=SURFACE_2)
-        self.frame_ativos.pack(fill="both", expand=True, padx=14, pady=(0, 6))
+        self.frame_ativos = ctk.CTkFrame(painel, fg_color=SURFACE_2)
+        self.frame_ativos.pack(fill="x", padx=14, pady=(0, 6))
 
         ctk.CTkButton(painel, text="+ Adicionar ativo", fg_color=SURFACE_2, hover_color="#2A2E38",
                       text_color=TEXT, command=self._adiciona_linha_vazia).pack(
@@ -308,6 +312,23 @@ class App(ctk.CTk):
                                                   command=self._adicionar_ativo_ao_portfolio)
         self.btn_adicionar_ativo.pack(side="left")
 
+        self.frame_salvar_curada = ctk.CTkFrame(detalhe, fg_color="transparent")
+        self.frame_salvar_curada.grid(row=5, column=0, sticky="we", padx=16, pady=(0, 16))
+        ctk.CTkLabel(self.frame_salvar_curada, text="Nao esta na lista curada -", text_color=TEXT_MUTED).pack(
+            side="left", padx=(0, 8))
+        self.opcao_classe_salvar = ctk.CTkOptionMenu(self.frame_salvar_curada, values=["Acoes", "ETFs", "FIIs"],
+                                                      width=90, fg_color=SURFACE, button_color=SURFACE_2,
+                                                      button_hover_color=HEARTWOOD, text_color=TEXT,
+                                                      dropdown_fg_color=SURFACE, dropdown_text_color=TEXT)
+        self.opcao_classe_salvar.pack(side="left", padx=(0, 6))
+        self.entry_setor_salvar = ctk.CTkEntry(self.frame_salvar_curada, placeholder_text="Setor", width=170,
+                                                fg_color=SURFACE, border_color=TEXT_MUTED, border_width=1,
+                                                text_color=TEXT, placeholder_text_color=TEXT_MUTED)
+        self.entry_setor_salvar.pack(side="left", padx=(0, 6))
+        ctk.CTkButton(self.frame_salvar_curada, text="+ Salvar na lista", fg_color=SAPWOOD, hover_color=POSITIVO,
+                      text_color=INK, command=self._salvar_ativo_na_lista).pack(side="left")
+        self.frame_salvar_curada.grid_remove()
+
         self._filtra_lista_ativos()
 
     def _on_muda_classe(self):
@@ -366,6 +387,25 @@ class App(ctk.CTk):
         }
         self._selecionar_ativo_explorar(ativo)
 
+    def _salvar_ativo_na_lista(self):
+        ativo = self.ativo_selecionado_explorar
+        if ativo is None:
+            return
+
+        classe = MAPA_CLASSE.get(self.opcao_classe_salvar.get(), "Acao")
+        setor = self.entry_setor_salvar.get().strip() or "Outro"
+        nome = self._info_ativo_atual.get("nome_longo") or ativo["nome"]
+
+        novo = {"ticker": ativo["ticker"], "nome": nome, "setor": setor, "classe": classe}
+        dfx.salvar_ativo_no_universo(novo)
+
+        self.universo_ativos = dfx.carrega_universo_ativos()
+        self.ativo_selecionado_explorar = novo
+        self._on_muda_classe()
+        self.frame_salvar_curada.grid_remove()
+        self.label_info_ativo.configure(
+            text=self.label_info_ativo.cget("text") + f"\n\n{novo['ticker']} salvo na lista curada ({setor}).")
+
     def _on_muda_horizonte(self):
         if self.ativo_selecionado_explorar is not None:
             self._selecionar_ativo_explorar(self.ativo_selecionado_explorar)
@@ -376,6 +416,7 @@ class App(ctk.CTk):
         self.label_info_ativo.configure(text="Carregando dados do Yahoo Finance...")
         self.label_stats_ativo.configure(text="")
         self.btn_adicionar_ativo.configure(state="disabled")
+        self.frame_salvar_curada.grid_remove()
         self.fig_explorar.clear()
         self.canvas_explorar.draw()
 
@@ -399,8 +440,20 @@ class App(ctk.CTk):
         stats = payload["stats"]
         ativo = payload["ativo"]
 
-        if ativo["classe"] == "Outro" and info.get("nome_longo"):
-            self.label_titulo_ativo.configure(text=f"{info['nome_longo']} ({ativo['ticker']})")
+        self._info_ativo_atual = info
+
+        if ativo["classe"] == "Outro":
+            if info.get("nome_longo"):
+                self.label_titulo_ativo.configure(text=f"{info['nome_longo']} ({ativo['ticker']})")
+            if info.get("price_to_book") is None and info.get("market_cap") is None:
+                self.opcao_classe_salvar.set("ETFs")
+            elif info.get("setor") == "Real Estate":
+                self.opcao_classe_salvar.set("FIIs")
+            else:
+                self.opcao_classe_salvar.set("Acoes")
+            self.entry_setor_salvar.delete(0, "end")
+            self.entry_setor_salvar.insert(0, info.get("setor") or "")
+            self.frame_salvar_curada.grid()
 
         linhas_info = []
         if info.get("setor"):

@@ -53,6 +53,24 @@ def carrega_universo_ativos(caminho: str = "ativos_b3.json") -> list[dict]:
     return dados["ativos"]
 
 
+def salvar_ativo_no_universo(ativo: dict, caminho: str = "ativos_b3.json") -> None:
+    """Adiciona um ativo (ticker/nome/setor/classe) a lista curada, p/ aparecer nas proximas buscas."""
+    with open(caminho, "r", encoding="utf-8") as f:
+        dados = json.load(f)
+
+    ticker = normaliza_ticker(ativo["ticker"])
+    dados["ativos"] = [a for a in dados["ativos"] if a["ticker"] != ticker]
+    dados["ativos"].append({
+        "ticker": ticker,
+        "nome": ativo["nome"],
+        "setor": ativo["setor"],
+        "classe": ativo["classe"],
+    })
+
+    with open(caminho, "w", encoding="utf-8") as f:
+        json.dump(dados, f, indent=2, ensure_ascii=False)
+
+
 def obter_info_ativo(ticker: str) -> dict:
     """Info fundamentalista best-effort (Yahoo Finance pode falhar/atrasar/nao ter o dado - nao é critico).
 
