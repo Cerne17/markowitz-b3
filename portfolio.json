@@ -2,31 +2,31 @@
   "ativos": [
     {
       "ticker": "PETR4.SA",
-      "valor_investido": 5000.0
+      "valor_investido": 0.0
     },
     {
       "ticker": "ITUB4.SA",
-      "valor_investido": 5000.0
+      "valor_investido": 0.0
     },
     {
       "ticker": "WEGE3.SA",
-      "valor_investido": 1000.0
+      "valor_investido": 0.0
     },
     {
       "ticker": "MXRF11.SA",
-      "valor_investido": 1000.0
+      "valor_investido": 0.0
     },
     {
       "ticker": "IVVB11.SA",
-      "valor_investido": 1000.0
+      "valor_investido": 0.0
     },
     {
       "ticker": "KNCR11.SA",
-      "valor_investido": 1000.0
+      "valor_investido": 0.0
     },
     {
       "ticker": "AUPO11.SA",
-      "valor_investido": 1000.0
+      "valor_investido": 0.0
     }
   ],
   "data_inicio": "2022-01-01",

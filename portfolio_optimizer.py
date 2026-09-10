@@ -183,10 +183,11 @@ def sugestao_rebalanceamento(tickers: list[str], valores_atuais: list[float], pe
     total_com_aporte = total_atual + aporte
     valores_alvo = pesos_alvo * total_com_aporte
     diffs = valores_alvo - np.array(valores_atuais)
+    peso_atual = np.array(valores_atuais) / total_atual if total_atual > 0 else np.zeros(len(valores_atuais))
     return pd.DataFrame({
         "ticker": tickers,
         "valor_atual": valores_atuais,
-        "peso_atual": np.array(valores_atuais) / total_atual,
+        "peso_atual": peso_atual,
         "peso_alvo": pesos_alvo,
         "valor_alvo": valores_alvo,
         "ajuste": diffs,

@@ -5,6 +5,7 @@ import threading
 from tkinter import messagebox, ttk
 
 import customtkinter as ctk
+import numpy as np
 import pandas as pd
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.colors import LinearSegmentedColormap
@@ -667,6 +668,8 @@ class App(ctk.CTk):
         aporte = float(aporte_txt) if aporte_txt else 0.0
         if aporte < 0:
             raise ValueError("Aporte disponivel nao pode ser negativo.")
+        if sum(a["valor_investido"] for a in ativos) + aporte <= 0:
+            raise ValueError("Informe um valor investido em algum ativo ou um aporte maior que zero.")
 
         if not (1 / len(ativos) - 1e-9 <= peso_maximo <= 1.0):
             raise ValueError(
@@ -715,7 +718,10 @@ class App(ctk.CTk):
             taxa_livre = cfg["taxa_livre_risco_anual"]
             peso_maximo = cfg.get("peso_maximo_por_ativo", 1.0)
 
-            pesos_atuais = opt.pesos_atuais(valores)
+            if sum(valores) > 0:
+                pesos_atuais = opt.pesos_atuais(valores)
+            else:
+                pesos_atuais = np.zeros(len(valores))  # carteira ainda vazia - so tem o aporte
             carteira_atual = opt.desempenho_portfolio(pesos_atuais, media_anual, cov_anual, taxa_livre)
             carteira_max_sharpe = opt.otimiza_max_sharpe(media_anual, cov_anual, taxa_livre, peso_maximo)
             carteira_min_vol = opt.otimiza_min_volatilidade(media_anual, cov_anual, taxa_livre, peso_maximo)
