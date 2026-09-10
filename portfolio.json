@@ -5,19 +5,11 @@
       "valor_investido": 5000.0
     },
     {
-      "ticker": "VALE3.SA",
-      "valor_investido": 5000.0
-    },
-    {
       "ticker": "ITUB4.SA",
       "valor_investido": 5000.0
     },
     {
       "ticker": "WEGE3.SA",
-      "valor_investido": 1000.0
-    },
-    {
-      "ticker": "EMBJ3.SA",
       "valor_investido": 1000.0
     },
     {
@@ -31,11 +23,15 @@
     {
       "ticker": "KNCR11.SA",
       "valor_investido": 1000.0
+    },
+    {
+      "ticker": "AUPO11.SA",
+      "valor_investido": 1000.0
     }
   ],
   "data_inicio": "2022-01-01",
   "taxa_livre_risco_anual": 0.14,
-  "num_portfolios_simulados": 20000,
-  "peso_maximo_por_ativo": 0.4,
+  "num_portfolios_simulados": 50000,
+  "peso_maximo_por_ativo": 0.2,
   "aporte_disponivel": 1000.0
 }

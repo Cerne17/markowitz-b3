@@ -468,6 +468,12 @@
       "nome": "Hedge Fundo de Fundos",
       "setor": "FII - Fundo de Fundos",
       "classe": "FII"
+    },
+    {
+      "ticker": "AUPO11.SA",
+      "nome": "BTG PACTUAL TEVA AUVP ITBR LIQUIDEZ FUNDO DE ÍNDICE",
+      "setor": "Renda Fixa",
+      "classe": "ETF"
     }
   ]
 }

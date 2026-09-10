@@ -132,7 +132,8 @@ class App(ctk.CTk):
 
         ctk.CTkLabel(painel, text="Minha Carteira", font=ctk.CTkFont(size=18, weight="bold"),
                      text_color=TEXT).pack(anchor="w", padx=14, pady=(14, 2))
-        ctk.CTkLabel(painel, text="Valor em R$ investido em cada ativo (nao e quantidade de acoes/cotas)",
+        ctk.CTkLabel(painel, text="Valor em R$ investido em cada ativo (nao e qtd. de acoes/cotas). "
+                                   "Use 0 p/ incluir na analise um ativo que ainda nao tem.",
                      font=ctk.CTkFont(size=11), text_color=TEXT_MUTED, wraplength=310, justify="left").pack(
             anchor="w", padx=14, pady=(0, 8))
 
@@ -508,8 +509,8 @@ class App(ctk.CTk):
         except ValueError:
             messagebox.showerror("Valor invalido", "Informe um valor numerico para investir.")
             return
-        if valor <= 0:
-            messagebox.showerror("Valor invalido", "O valor deve ser maior que zero.")
+        if valor < 0:
+            messagebox.showerror("Valor invalido", "O valor nao pode ser negativo.")
             return
 
         ticker_norm = dfx.normaliza_ticker(ativo["ticker"])
@@ -645,8 +646,8 @@ class App(ctk.CTk):
             if dados is None:
                 continue
             ticker, valor = dados
-            if valor <= 0:
-                raise ValueError(f"Valor investido invalido para {ticker}.")
+            if valor < 0:
+                raise ValueError(f"Valor investido invalido para {ticker} (nao pode ser negativo).")
             ativos.append({"ticker": dfx.normaliza_ticker(ticker), "valor_investido": valor})
 
         if len(ativos) < 2:
