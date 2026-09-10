@@ -59,6 +59,25 @@ def cor_ativo(indice: int) -> str:
 
 MAPA_CLASSE = {"Acoes": "Acao", "ETFs": "ETF", "FIIs": "FII"}
 
+FILTROS_REBALANCEAMENTO = {
+    "Todos": None,
+    "Com posicao atual (> 0)": lambda df: df[df["valor_atual"] > 0],
+    "Com alocacao alvo (> 0)": lambda df: df[df["peso_alvo"] > 1e-6],
+    "So compras": lambda df: df[df["cotas_sugeridas"] > 0],
+    "So vendas": lambda df: df[df["cotas_sugeridas"] < 0],
+}
+
+# coluna da tabela -> coluna do DataFrame usada de fato p/ ordenar (numerica, nao o texto formatado)
+MAPA_ORDENACAO_REBALANCEAMENTO = {
+    "ticker": "ticker",
+    "peso_atual": "peso_atual",
+    "peso_alvo": "peso_alvo",
+    "valor_atual": "valor_atual",
+    "preco_atual": "preco_atual",
+    "ajuste": "valor_transacao",
+    "ir_estimado": "ir_estimado",
+}
+
 
 # larguras fixas compartilhadas entre o cabecalho e cada LinhaAtivo, p/ colunas alinhadas
 LARGURA_COL_TICKER = 78
@@ -106,6 +125,8 @@ class App(ctk.CTk):
         self.linhas_ativos: list[LinhaAtivo] = []
         self.resultado = None
         self.pontos_fronteira: list[opt.Portfolio] = []
+        self.df_rebalanceamento: pd.DataFrame | None = None
+        self._ordenacao_rebalanceamento: tuple[str, bool] = ("ticker", False)
         self.escolhida: opt.Portfolio | None = None
         self.universo_ativos = dfx.carrega_universo_ativos()
         self.ativo_selecionado_explorar: dict | None = None
@@ -538,11 +559,24 @@ class App(ctk.CTk):
         self.card_escolhida = self._cria_card(self.tab_resumo, "Alvo Escolhido na Fronteira", 3,
                                                destaque=True)
 
+        linha_titulo = ctk.CTkFrame(self.tab_resumo, fg_color="transparent")
+        linha_titulo.grid(row=1, column=0, columnspan=4, sticky="we", padx=16, pady=(18, 4))
+        linha_titulo.grid_columnconfigure(0, weight=1)
+
         self.label_titulo_rebalanceamento = ctk.CTkLabel(
-            self.tab_resumo,
+            linha_titulo,
             text="Sugestao de rebalanceamento (clique num ponto da Fronteira Eficiente p/ mudar o alvo)",
-            font=ctk.CTkFont(size=14, weight="bold"), text_color=TEXT, wraplength=900, justify="left")
-        self.label_titulo_rebalanceamento.grid(row=1, column=0, columnspan=4, sticky="w", padx=16, pady=(18, 4))
+            font=ctk.CTkFont(size=14, weight="bold"), text_color=TEXT, wraplength=700, justify="left")
+        self.label_titulo_rebalanceamento.grid(row=0, column=0, sticky="w")
+
+        ctk.CTkLabel(linha_titulo, text="Filtro:", text_color=TEXT_MUTED).grid(row=0, column=1, padx=(8, 4))
+        self.opcao_filtro_rebalanceamento = ctk.CTkOptionMenu(
+            linha_titulo, values=list(FILTROS_REBALANCEAMENTO.keys()), width=200,
+            fg_color=SURFACE_2, button_color=HEARTWOOD, button_hover_color=HEARTWOOD_GLOW,
+            text_color=TEXT, dropdown_fg_color=SURFACE, dropdown_text_color=TEXT,
+            command=lambda _: self._renderiza_tabela_rebalanceamento())
+        self.opcao_filtro_rebalanceamento.set("Todos")
+        self.opcao_filtro_rebalanceamento.grid(row=0, column=2)
 
         estilo_tv = ttk.Style()
         estilo_tv.theme_use("default")
@@ -553,12 +587,14 @@ class App(ctk.CTk):
 
         colunas = ("ticker", "peso_atual", "peso_alvo", "valor_atual", "preco_atual", "ajuste", "ir_estimado")
         self.tabela_rebalanceamento = ttk.Treeview(self.tab_resumo, columns=colunas, show="headings", height=8)
-        titulos = {"ticker": "Ticker", "peso_atual": "Peso atual", "peso_alvo": "Peso alvo",
-                   "valor_atual": "Valor atual (R$)", "preco_atual": "Preco/cota (R$)",
-                   "ajuste": "Ajuste sugerido", "ir_estimado": "IR estimado (venda)"}
+        self._titulos_colunas_rebalanceamento = {
+            "ticker": "Ticker", "peso_atual": "Peso atual", "peso_alvo": "Peso alvo",
+            "valor_atual": "Valor atual (R$)", "preco_atual": "Preco/cota (R$)",
+            "ajuste": "Ajuste sugerido", "ir_estimado": "IR estimado (venda)"}
         larguras = {"ajuste": 240}
         for c in colunas:
-            self.tabela_rebalanceamento.heading(c, text=titulos[c])
+            self.tabela_rebalanceamento.heading(c, text=self._titulos_colunas_rebalanceamento[c],
+                                                 command=lambda c=c: self._ordenar_tabela_rebalanceamento(c))
             self.tabela_rebalanceamento.column(c, anchor="center", width=larguras.get(c, 120))
         self.tabela_rebalanceamento.tag_configure("comprar", foreground=POSITIVO)
         self.tabela_rebalanceamento.tag_configure("vender", foreground=NEGATIVO)
@@ -861,9 +897,16 @@ class App(ctk.CTk):
         aporte = self._ler_aporte()
         total = sum(r["valores"]) + aporte
 
-        rebalanceamento = opt.sugestao_rebalanceamento(r["tickers"], r["valores"], self.escolhida.pesos, aporte,
-                                                        precos_atuais=r["precos_atuais"])
-        self._atualiza_tabela_rebalanceamento(rebalanceamento, r["classes_tickers"])
+        df = opt.sugestao_rebalanceamento(r["tickers"], r["valores"], self.escolhida.pesos, aporte,
+                                           precos_atuais=r["precos_atuais"])
+        df["classe"] = r["classes_tickers"]
+        total_venda_acoes = -df.loc[(df["cotas_sugeridas"] < 0) & (df["classe"] == "Acao"), "valor_transacao"].sum()
+        df["ir_estimado"] = df.apply(
+            lambda row: opt.estima_aliquota_ir(row["classe"], total_venda_acoes)
+            if row["cotas_sugeridas"] < 0 else "-", axis=1)
+
+        self.df_rebalanceamento = df
+        self._renderiza_tabela_rebalanceamento()
         self._atualiza_renda_passiva(r, total)
 
         self.label_titulo_rebalanceamento.configure(
@@ -895,14 +938,38 @@ class App(ctk.CTk):
             texto += f" Sem dado de yield p/: {', '.join(sem_dado)}."
         self.label_renda_passiva.configure(text=texto)
 
-    def _atualiza_tabela_rebalanceamento(self, df, classes: list[str]):
+    def _ordenar_tabela_rebalanceamento(self, coluna: str):
+        atual_col, atual_rev = self._ordenacao_rebalanceamento
+        self._ordenacao_rebalanceamento = (coluna, not atual_rev) if atual_col == coluna else (coluna, False)
+        self._renderiza_tabela_rebalanceamento()
+
+    def _atualiza_headers_ordenacao(self):
+        coluna_ativa, reverso = self._ordenacao_rebalanceamento
+        indicador = " v" if reverso else " ^"
+        for c, titulo in self._titulos_colunas_rebalanceamento.items():
+            self.tabela_rebalanceamento.heading(c, text=titulo + (indicador if c == coluna_ativa else ""))
+
+    def _renderiza_tabela_rebalanceamento(self):
+        if self.df_rebalanceamento is None:
+            return
+        df = self.df_rebalanceamento
+
+        filtro_fn = FILTROS_REBALANCEAMENTO.get(self.opcao_filtro_rebalanceamento.get())
+        if filtro_fn is not None:
+            df = filtro_fn(df)
+
+        coluna, reverso = self._ordenacao_rebalanceamento
+        chave_col = MAPA_ORDENACAO_REBALANCEAMENTO.get(coluna, coluna)
+        if chave_col in df.columns:
+            if df[chave_col].dtype == object:
+                df = df.sort_values(by=chave_col, ascending=not reverso, key=lambda s: s.str.lower())
+            else:
+                df = df.sort_values(by=chave_col, ascending=not reverso)
+
         for item in self.tabela_rebalanceamento.get_children():
             self.tabela_rebalanceamento.delete(item)
 
-        total_venda_acoes = sum(-row["valor_transacao"] for (_, row), c in zip(df.iterrows(), classes)
-                                 if row["cotas_sugeridas"] < 0 and c == "Acao")
-
-        for (_, row), classe in zip(df.iterrows(), classes):
+        for _, row in df.iterrows():
             cotas = int(row["cotas_sugeridas"])
             if cotas > 0:
                 tag = "comprar"
@@ -914,7 +981,6 @@ class App(ctk.CTk):
             else:
                 tag = ""
                 texto_ajuste = "Sem ajuste (< 1 cota)"
-            ir = opt.estima_aliquota_ir(classe, total_venda_acoes) if cotas < 0 else "-"
             self.tabela_rebalanceamento.insert("", "end", tags=(tag,), values=(
                 row["ticker"],
                 f"{row['peso_atual'] * 100:.1f}%",
@@ -922,8 +988,10 @@ class App(ctk.CTk):
                 f"{row['valor_atual']:.2f}",
                 f"{row['preco_atual']:.2f}",
                 texto_ajuste,
-                ir,
+                row["ir_estimado"],
             ))
+
+        self._atualiza_headers_ordenacao()
 
     def _estiliza_eixos(self, ax):
         ax.set_facecolor(SURFACE)
