@@ -60,16 +60,20 @@ def calmar_ratio(retorno_anual: float, max_drawdown: float) -> float:
 
 def estatisticas_extras_portfolio(retornos_diarios: pd.DataFrame, pesos: np.ndarray,
                                    retorno_anual: float, taxa_livre_risco: float) -> dict:
-    """Sortino, Calmar e max drawdown de uma carteira com pesos dados - complementa Sharpe/vol,
-    que so enxergam risco simetrico. Serve p/ qualquer estrategia, nao so as otimizadas p/ isso."""
+    """Sortino, Calmar, CVaR/STARR e max drawdown de uma carteira com pesos dados - complementa
+    Sharpe/vol, que so enxergam risco simetrico. Serve p/ qualquer estrategia, nao so as
+    otimizadas p/ isso."""
     if not np.any(pesos):
-        return {"sortino": 0.0, "calmar": 0.0, "max_drawdown": 0.0}
+        return {"sortino": 0.0, "calmar": 0.0, "max_drawdown": 0.0, "cvar_anual": 0.0, "starr": 0.0}
     dd_anual = downside_deviation_anual(retornos_diarios, pesos, taxa_livre_risco)
     mdd = max_drawdown_portfolio(retornos_diarios, pesos)
+    cvar_anual = cvar_historico_anual(retornos_diarios, pesos)
     return {
         "sortino": sortino_ratio(retorno_anual, dd_anual, taxa_livre_risco),
         "calmar": calmar_ratio(retorno_anual, mdd),
         "max_drawdown": mdd,
+        "cvar_anual": cvar_anual,
+        "starr": starr_ratio(retorno_anual, cvar_anual, taxa_livre_risco),
     }
 
 
@@ -108,6 +112,51 @@ def otimiza_max_calmar(media_anual: pd.Series, cov_anual: pd.DataFrame, retornos
     chute = np.repeat(1 / n, n)
     limites = tuple((0.0, peso_maximo_por_ativo) for _ in range(n))
     resultado = minimize(neg_calmar, chute, method="SLSQP", bounds=limites, constraints=_restricoes_base(n))
+    return desempenho_portfolio(resultado.x, media_anual, cov_anual, taxa_livre_risco)
+
+
+def cvar_historico_anual(retornos_diarios: pd.DataFrame, pesos: np.ndarray, confianca: float = 0.95) -> float:
+    """CVaR historico anualizado pela mesma convencao sqrt(tempo) usada na vol/downside deviation
+    (aproximacao - CVaR nao escala exatamente assim, mas mantem os indices comparaveis entre si)."""
+    rp = retornos_diarios.dot(pesos)
+    return var_cvar_historico(rp, confianca)["cvar_diario"] * np.sqrt(DIAS_UTEIS_ANO)
+
+
+def starr_ratio(retorno_anual: float, cvar_anual: float, taxa_livre_risco: float) -> float:
+    return (retorno_anual - taxa_livre_risco) / cvar_anual if cvar_anual > 0 else 0.0
+
+
+def otimiza_max_starr(media_anual: pd.Series, cov_anual: pd.DataFrame, retornos_diarios: pd.DataFrame,
+                       taxa_livre_risco: float, peso_maximo_por_ativo: float = 1.0,
+                       confianca: float = 0.95) -> Portfolio:
+    """Maximiza o STARR Ratio (retorno-rf)/CVaR - troca a vol inteira do Sharpe pela perda media
+    esperada nos piores cenarios (cauda), foco em risco de cauda em vez de dispersao simetrica."""
+    n = len(media_anual)
+
+    def neg_starr(pesos):
+        retorno = float(np.dot(pesos, media_anual))
+        cvar = cvar_historico_anual(retornos_diarios, pesos, confianca)
+        return -starr_ratio(retorno, cvar, taxa_livre_risco)
+
+    chute = np.repeat(1 / n, n)
+    limites = tuple((0.0, peso_maximo_por_ativo) for _ in range(n))
+    resultado = minimize(neg_starr, chute, method="SLSQP", bounds=limites, constraints=_restricoes_base(n))
+    return desempenho_portfolio(resultado.x, media_anual, cov_anual, taxa_livre_risco)
+
+
+def otimiza_min_cvar(media_anual: pd.Series, cov_anual: pd.DataFrame, retornos_diarios: pd.DataFrame,
+                      taxa_livre_risco: float, peso_maximo_por_ativo: float = 1.0,
+                      confianca: float = 0.95) -> Portfolio:
+    """Minimiza o CVaR historico (perda media nos piores 5% dos dias), em vez da vol inteira
+    como o Min Vol - mais conservador especificamente contra cenarios de cauda ruim."""
+    n = len(media_anual)
+
+    def objetivo(pesos):
+        return cvar_historico_anual(retornos_diarios, pesos, confianca)
+
+    chute = np.repeat(1 / n, n)
+    limites = tuple((0.0, peso_maximo_por_ativo) for _ in range(n))
+    resultado = minimize(objetivo, chute, method="SLSQP", bounds=limites, constraints=_restricoes_base(n))
     return desempenho_portfolio(resultado.x, media_anual, cov_anual, taxa_livre_risco)
 
 
