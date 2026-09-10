@@ -1,10 +1,6 @@
 {
   "ativos": [
     {
-      "ticker": "PETR4.SA",
-      "valor_investido": 0.0
-    },
-    {
       "ticker": "ITUB4.SA",
       "valor_investido": 0.0
     },
@@ -26,6 +22,26 @@
     },
     {
       "ticker": "AUPO11.SA",
+      "valor_investido": 0.0
+    },
+    {
+      "ticker": "SMAL11.SA",
+      "valor_investido": 0.0
+    },
+    {
+      "ticker": "KLBN4.SA",
+      "valor_investido": 0.0
+    },
+    {
+      "ticker": "SBSP3.SA",
+      "valor_investido": 0.0
+    },
+    {
+      "ticker": "BBAS3.SA",
+      "valor_investido": 0.0
+    },
+    {
+      "ticker": "TOTS3.SA",
       "valor_investido": 0.0
     }
   ],

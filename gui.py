@@ -551,14 +551,15 @@ class App(ctk.CTk):
         estilo_tv.configure("Treeview.Heading", background=INK, foreground=TEXT)
         estilo_tv.map("Treeview", background=[("selected", HEARTWOOD)], foreground=[("selected", INK)])
 
-        colunas = ("ticker", "peso_atual", "peso_alvo", "valor_atual", "valor_alvo", "ajuste", "ir_estimado")
+        colunas = ("ticker", "peso_atual", "peso_alvo", "valor_atual", "preco_atual", "ajuste", "ir_estimado")
         self.tabela_rebalanceamento = ttk.Treeview(self.tab_resumo, columns=colunas, show="headings", height=8)
         titulos = {"ticker": "Ticker", "peso_atual": "Peso atual", "peso_alvo": "Peso alvo",
-                   "valor_atual": "Valor atual (R$)", "valor_alvo": "Valor alvo (R$)", "ajuste": "Ajuste (R$)",
-                   "ir_estimado": "IR estimado (venda)"}
+                   "valor_atual": "Valor atual (R$)", "preco_atual": "Preco/cota (R$)",
+                   "ajuste": "Ajuste sugerido", "ir_estimado": "IR estimado (venda)"}
+        larguras = {"ajuste": 240}
         for c in colunas:
             self.tabela_rebalanceamento.heading(c, text=titulos[c])
-            self.tabela_rebalanceamento.column(c, anchor="center", width=140)
+            self.tabela_rebalanceamento.column(c, anchor="center", width=larguras.get(c, 120))
         self.tabela_rebalanceamento.tag_configure("comprar", foreground=POSITIVO)
         self.tabela_rebalanceamento.tag_configure("vender", foreground=NEGATIVO)
         self.tabela_rebalanceamento.grid(row=2, column=0, columnspan=4, sticky="nswe", padx=16, pady=6)
@@ -566,9 +567,10 @@ class App(ctk.CTk):
 
         self.label_nota_ir = ctk.CTkLabel(
             self.tab_resumo,
-            text=("IR estimado e simplificado: nao calcula o ganho de capital real (o app nao rastreia seu "
-                  "preco medio de compra), so indica a aliquota/isencao que se aplicaria na venda. "
-                  "Consulte um contador antes de decidir."),
+            text=("Cotas arredondadas p/ numero inteiro (preco do ultimo fechamento) - o valor real "
+                  "da transacao pode diferir um pouco do ajuste teorico. IR estimado e simplificado: nao "
+                  "calcula o ganho de capital real (o app nao rastreia seu preco medio de compra), so "
+                  "indica a aliquota/isencao que se aplicaria na venda. Consulte um contador antes de decidir."),
             font=ctk.CTkFont(size=10), text_color=TEXT_MUTED, wraplength=900, justify="left")
         self.label_nota_ir.grid(row=3, column=0, columnspan=4, sticky="w", padx=16, pady=(0, 6))
 
@@ -733,12 +735,14 @@ class App(ctk.CTk):
 
             dividend_yields = dfx.obter_dividend_yields(tickers)
             classes_tickers = [self._classe_do_ticker(t) for t in tickers]
+            precos_atuais = precos.iloc[-1][tickers].tolist()
 
             self.fila.put(("ok", {
                 "tickers": tickers,
                 "valores": valores,
                 "classes_tickers": classes_tickers,
                 "dividend_yields": dividend_yields,
+                "precos_atuais": precos_atuais,
                 "carteira_atual": carteira_atual,
                 "carteira_max_sharpe": carteira_max_sharpe,
                 "carteira_min_vol": carteira_min_vol,
@@ -857,7 +861,8 @@ class App(ctk.CTk):
         aporte = self._ler_aporte()
         total = sum(r["valores"]) + aporte
 
-        rebalanceamento = opt.sugestao_rebalanceamento(r["tickers"], r["valores"], self.escolhida.pesos, aporte)
+        rebalanceamento = opt.sugestao_rebalanceamento(r["tickers"], r["valores"], self.escolhida.pesos, aporte,
+                                                        precos_atuais=r["precos_atuais"])
         self._atualiza_tabela_rebalanceamento(rebalanceamento, r["classes_tickers"])
         self._atualiza_renda_passiva(r, total)
 
@@ -894,19 +899,29 @@ class App(ctk.CTk):
         for item in self.tabela_rebalanceamento.get_children():
             self.tabela_rebalanceamento.delete(item)
 
-        total_venda_acoes = sum(-row["ajuste"] for (_, row), c in zip(df.iterrows(), classes)
-                                 if row["ajuste"] < 0 and c == "Acao")
+        total_venda_acoes = sum(-row["valor_transacao"] for (_, row), c in zip(df.iterrows(), classes)
+                                 if row["cotas_sugeridas"] < 0 and c == "Acao")
 
         for (_, row), classe in zip(df.iterrows(), classes):
-            tag = "comprar" if row["ajuste"] > 0 else ("vender" if row["ajuste"] < 0 else "")
-            ir = opt.estima_aliquota_ir(classe, total_venda_acoes) if row["ajuste"] < 0 else "-"
+            cotas = int(row["cotas_sugeridas"])
+            if cotas > 0:
+                tag = "comprar"
+                texto_ajuste = f"Comprar {cotas} cota{'s' if cotas != 1 else ''} (R$ {row['valor_transacao']:.2f})"
+            elif cotas < 0:
+                tag = "vender"
+                texto_ajuste = (f"Vender {abs(cotas)} cota{'s' if cotas != -1 else ''} "
+                                 f"(R$ {abs(row['valor_transacao']):.2f})")
+            else:
+                tag = ""
+                texto_ajuste = "Sem ajuste (< 1 cota)"
+            ir = opt.estima_aliquota_ir(classe, total_venda_acoes) if cotas < 0 else "-"
             self.tabela_rebalanceamento.insert("", "end", tags=(tag,), values=(
                 row["ticker"],
                 f"{row['peso_atual'] * 100:.1f}%",
                 f"{row['peso_alvo'] * 100:.1f}%",
                 f"{row['valor_atual']:.2f}",
-                f"{row['valor_alvo']:.2f}",
-                f"{row['ajuste']:+.2f}",
+                f"{row['preco_atual']:.2f}",
+                texto_ajuste,
                 ir,
             ))
 

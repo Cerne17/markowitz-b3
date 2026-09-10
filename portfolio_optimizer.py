@@ -177,18 +177,33 @@ def pesos_atuais(valores_investidos: list[float]) -> np.ndarray:
 
 
 def sugestao_rebalanceamento(tickers: list[str], valores_atuais: list[float], pesos_alvo: np.ndarray,
-                              aporte: float = 0.0) -> pd.DataFrame:
-    """Ajuste sugerido por ativo considerando a carteira atual + um aporte novo a investir agora."""
+                              aporte: float = 0.0, precos_atuais: list[float] | None = None) -> pd.DataFrame:
+    """Ajuste sugerido por ativo considerando a carteira atual + um aporte novo a investir agora.
+
+    Se precos_atuais for informado, tambem calcula quantas cotas/acoes inteiras comprar ou
+    vender (arredondado) e o valor real dessa transacao - B3 nao negocia fracao de cota no
+    lote padrao, entao o R$ exato do ajuste teorico quase nunca bate com o que da p/ comprar.
+    """
     total_atual = sum(valores_atuais)
     total_com_aporte = total_atual + aporte
     valores_alvo = pesos_alvo * total_com_aporte
     diffs = valores_alvo - np.array(valores_atuais)
     peso_atual = np.array(valores_atuais) / total_atual if total_atual > 0 else np.zeros(len(valores_atuais))
-    return pd.DataFrame({
+
+    dados = {
         "ticker": tickers,
         "valor_atual": valores_atuais,
         "peso_atual": peso_atual,
         "peso_alvo": pesos_alvo,
         "valor_alvo": valores_alvo,
         "ajuste": diffs,
-    })
+    }
+
+    if precos_atuais is not None:
+        precos_arr = np.array(precos_atuais)
+        cotas = np.round(diffs / precos_arr).astype(int)
+        dados["preco_atual"] = precos_arr
+        dados["cotas_sugeridas"] = cotas
+        dados["valor_transacao"] = cotas * precos_arr
+
+    return pd.DataFrame(dados)

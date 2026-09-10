@@ -474,6 +474,18 @@
       "nome": "BTG PACTUAL TEVA AUVP ITBR LIQUIDEZ FUNDO DE ÍNDICE",
       "setor": "Renda Fixa",
       "classe": "ETF"
+    },
+    {
+      "ticker": "KLBN4.SA",
+      "nome": "Klabin S.A.",
+      "setor": "Papel e Celulose",
+      "classe": "Acao"
+    },
+    {
+      "ticker": "SBSP3.SA",
+      "nome": "Companhia de Saneamento Básico do Estado de São Paulo - SABESP",
+      "setor": "Utilities",
+      "classe": "Acao"
     }
   ]
 }
