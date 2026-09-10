@@ -5,6 +5,7 @@ import threading
 from tkinter import messagebox, ttk
 
 import customtkinter as ctk
+import pandas as pd
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.figure import Figure
@@ -202,12 +203,14 @@ class App(ctk.CTk):
         self.tab_resumo = self.tabview.add("Resumo")
         self.tab_fronteira = self.tabview.add("Fronteira Eficiente")
         self.tab_alocacao = self.tabview.add("Alocacao")
+        self.tab_risco = self.tabview.add("Risco & Desempenho")
         self.tab_correlacao = self.tabview.add("Correlacao & Retornos")
 
         self._monta_tab_explorar()
         self._monta_tab_resumo()
         self._monta_canvas(self.tab_fronteira, "fronteira")
         self._monta_canvas(self.tab_alocacao, "alocacao")
+        self._monta_tab_risco()
         self._monta_canvas(self.tab_correlacao, "correlacao")
 
         self.canvas_fronteira.mpl_connect("button_press_event", self._on_click_fronteira)
@@ -546,10 +549,11 @@ class App(ctk.CTk):
         estilo_tv.configure("Treeview.Heading", background=INK, foreground=TEXT)
         estilo_tv.map("Treeview", background=[("selected", HEARTWOOD)], foreground=[("selected", INK)])
 
-        colunas = ("ticker", "peso_atual", "peso_alvo", "valor_atual", "valor_alvo", "ajuste")
+        colunas = ("ticker", "peso_atual", "peso_alvo", "valor_atual", "valor_alvo", "ajuste", "ir_estimado")
         self.tabela_rebalanceamento = ttk.Treeview(self.tab_resumo, columns=colunas, show="headings", height=8)
         titulos = {"ticker": "Ticker", "peso_atual": "Peso atual", "peso_alvo": "Peso alvo",
-                   "valor_atual": "Valor atual (R$)", "valor_alvo": "Valor alvo (R$)", "ajuste": "Ajuste (R$)"}
+                   "valor_atual": "Valor atual (R$)", "valor_alvo": "Valor alvo (R$)", "ajuste": "Ajuste (R$)",
+                   "ir_estimado": "IR estimado (venda)"}
         for c in colunas:
             self.tabela_rebalanceamento.heading(c, text=titulos[c])
             self.tabela_rebalanceamento.column(c, anchor="center", width=140)
@@ -557,6 +561,19 @@ class App(ctk.CTk):
         self.tabela_rebalanceamento.tag_configure("vender", foreground=NEGATIVO)
         self.tabela_rebalanceamento.grid(row=2, column=0, columnspan=4, sticky="nswe", padx=16, pady=6)
         self.tab_resumo.grid_rowconfigure(2, weight=1)
+
+        self.label_nota_ir = ctk.CTkLabel(
+            self.tab_resumo,
+            text=("IR estimado e simplificado: nao calcula o ganho de capital real (o app nao rastreia seu "
+                  "preco medio de compra), so indica a aliquota/isencao que se aplicaria na venda. "
+                  "Consulte um contador antes de decidir."),
+            font=ctk.CTkFont(size=10), text_color=TEXT_MUTED, wraplength=900, justify="left")
+        self.label_nota_ir.grid(row=3, column=0, columnspan=4, sticky="w", padx=16, pady=(0, 6))
+
+        self.label_renda_passiva = ctk.CTkLabel(
+            self.tab_resumo, text="", font=ctk.CTkFont(size=13, weight="bold"), text_color=SAPWOOD,
+            justify="left", wraplength=900)
+        self.label_renda_passiva.grid(row=4, column=0, columnspan=4, sticky="w", padx=16, pady=(0, 14))
 
     def _cria_card(self, master, titulo, coluna, destaque=False):
         card = ctk.CTkFrame(master, fg_color=SURFACE_2,
@@ -576,6 +593,24 @@ class App(ctk.CTk):
         canvas.get_tk_widget().pack(fill="both", expand=True, padx=8, pady=8)
         setattr(self, f"fig_{chave}", fig)
         setattr(self, f"canvas_{chave}", canvas)
+
+    def _monta_tab_risco(self):
+        tab = self.tab_risco
+        tab.grid_columnconfigure(0, weight=1)
+        tab.grid_rowconfigure(1, weight=1)
+
+        card_risco = ctk.CTkFrame(tab, fg_color=SURFACE_2)
+        card_risco.grid(row=0, column=0, sticky="we", padx=8, pady=(8, 4))
+        self.label_var_cvar = ctk.CTkLabel(
+            card_risco, text="Calcule a carteira p/ ver VaR/CVaR historico do alvo escolhido.",
+            justify="left", text_color=TEXT, font=ctk.CTkFont(size=13), wraplength=1000)
+        self.label_var_cvar.pack(anchor="w", padx=14, pady=10)
+
+        fig = Figure(figsize=(9, 8), dpi=100, facecolor=INK)
+        canvas = FigureCanvasTkAgg(fig, master=tab)
+        canvas.get_tk_widget().grid(row=1, column=0, sticky="nswe", padx=8, pady=(4, 8))
+        self.fig_risco = fig
+        self.canvas_risco = canvas
 
     # ---------- config <-> UI ----------
     def _carrega_config_na_ui(self):
@@ -666,8 +701,14 @@ class App(ctk.CTk):
             tickers = [a["ticker"] for a in cfg["ativos"]]
             valores = [a["valor_investido"] for a in cfg["ativos"]]
 
-            precos = dfx.baixar_precos(tickers, cfg["data_inicio"])
-            precos = precos[tickers]
+            tickers_com_benchmark = list(tickers)
+            if dfx.BENCHMARK_IBOVESPA not in tickers_com_benchmark:
+                tickers_com_benchmark.append(dfx.BENCHMARK_IBOVESPA)
+            precos_completo = dfx.baixar_precos(tickers_com_benchmark, cfg["data_inicio"])
+
+            precos = precos_completo[tickers]
+            benchmark_precos = precos_completo[dfx.BENCHMARK_IBOVESPA]
+
             retornos = dfx.calcula_retornos_diarios(precos)
             media_anual, cov_anual = opt.estatisticas_anuais(retornos)
             taxa_livre = cfg["taxa_livre_risco_anual"]
@@ -683,9 +724,14 @@ class App(ctk.CTk):
             correlacao = retornos.corr()
             precos_normalizados = precos / precos.iloc[0] * 100
 
+            dividend_yields = dfx.obter_dividend_yields(tickers)
+            classes_tickers = [self._classe_do_ticker(t) for t in tickers]
+
             self.fila.put(("ok", {
                 "tickers": tickers,
                 "valores": valores,
+                "classes_tickers": classes_tickers,
+                "dividend_yields": dividend_yields,
                 "carteira_atual": carteira_atual,
                 "carteira_max_sharpe": carteira_max_sharpe,
                 "carteira_min_vol": carteira_min_vol,
@@ -693,9 +739,16 @@ class App(ctk.CTk):
                 "simulacoes": simulacoes,
                 "correlacao": correlacao,
                 "precos_normalizados": precos_normalizados,
+                "retornos_diarios": retornos,
+                "taxa_livre": taxa_livre,
+                "benchmark_precos": benchmark_precos,
             }))
         except Exception as e:
             self.fila.put(("erro", str(e)))
+
+    def _classe_do_ticker(self, ticker: str) -> str:
+        encontrado = next((a for a in self.universo_ativos if a["ticker"] == ticker), None)
+        return encontrado["classe"] if encontrado else "Acao"
 
     def _processa_fila(self):
         try:
@@ -779,6 +832,7 @@ class App(ctk.CTk):
 
         self._recalcula_tabela_rebalanceamento()
         self._desenha_fronteira(r)
+        self._desenha_risco(r)
 
     def _recalcula_tabela_rebalanceamento(self):
         if self.resultado is None or self.escolhida is None:
@@ -788,18 +842,48 @@ class App(ctk.CTk):
         total = sum(r["valores"]) + aporte
 
         rebalanceamento = opt.sugestao_rebalanceamento(r["tickers"], r["valores"], self.escolhida.pesos, aporte)
-        self._atualiza_tabela_rebalanceamento(rebalanceamento)
+        self._atualiza_tabela_rebalanceamento(rebalanceamento, r["classes_tickers"])
+        self._atualiza_renda_passiva(r, total)
 
         self.label_titulo_rebalanceamento.configure(
             text=(f"Sugestao de rebalanceamento - carteira atual (R$ {sum(r['valores']):.2f}) "
                   f"+ aporte (R$ {aporte:.2f}) = total R$ {total:.2f}. "
                   "Clique num ponto da Fronteira Eficiente p/ mudar o alvo."))
 
-    def _atualiza_tabela_rebalanceamento(self, df):
+    def _atualiza_renda_passiva(self, r: dict, total_carteira: float):
+        tickers = r["tickers"]
+        dys = r["dividend_yields"]
+        pesos = self.escolhida.pesos
+
+        renda_anual = 0.0
+        sem_dado = []
+        for t, w in zip(tickers, pesos):
+            dy = dys.get(t)
+            if dy is None:
+                if w > 0:
+                    sem_dado.append(t)
+                continue
+            renda_anual += w * total_carteira * (dy / 100)
+
+        renda_mensal = renda_anual / 12
+        texto = (f"Renda passiva estimada (dividendos, alvo escolhido): R$ {renda_mensal:.2f}/mes "
+                 f"(R$ {renda_anual:.2f}/ano, ~{renda_anual / total_carteira * 100:.2f}% a.a. sobre R$ "
+                 f"{total_carteira:.2f}). Dividendos sao isentos de IR p/ pessoa fisica "
+                 "(JCP tem retencao de 15% na fonte).")
+        if sem_dado:
+            texto += f" Sem dado de yield p/: {', '.join(sem_dado)}."
+        self.label_renda_passiva.configure(text=texto)
+
+    def _atualiza_tabela_rebalanceamento(self, df, classes: list[str]):
         for item in self.tabela_rebalanceamento.get_children():
             self.tabela_rebalanceamento.delete(item)
-        for _, row in df.iterrows():
+
+        total_venda_acoes = sum(-row["ajuste"] for (_, row), c in zip(df.iterrows(), classes)
+                                 if row["ajuste"] < 0 and c == "Acao")
+
+        for (_, row), classe in zip(df.iterrows(), classes):
             tag = "comprar" if row["ajuste"] > 0 else ("vender" if row["ajuste"] < 0 else "")
+            ir = opt.estima_aliquota_ir(classe, total_venda_acoes) if row["ajuste"] < 0 else "-"
             self.tabela_rebalanceamento.insert("", "end", tags=(tag,), values=(
                 row["ticker"],
                 f"{row['peso_atual'] * 100:.1f}%",
@@ -807,6 +891,7 @@ class App(ctk.CTk):
                 f"{row['valor_atual']:.2f}",
                 f"{row['valor_alvo']:.2f}",
                 f"{row['ajuste']:+.2f}",
+                ir,
             ))
 
     def _estiliza_eixos(self, ax):
@@ -887,6 +972,63 @@ class App(ctk.CTk):
         fig.patch.set_facecolor(INK)
         fig.tight_layout(rect=(0, 0.08, 1, 1))
         self.canvas_alocacao.draw()
+
+    def _desenha_risco(self, r: dict):
+        retornos = r["retornos_diarios"]
+        pesos = self.escolhida.pesos
+        tickers = r["tickers"]
+
+        rp = opt.retornos_portfolio(retornos, pesos)
+        equity = (1 + rp).cumprod() * 100
+        drawdown = equity / equity.cummax() - 1
+
+        bm_ret = r["benchmark_precos"].pct_change().dropna()
+        bm_equity = ((1 + bm_ret).cumprod() * 100).reindex(equity.index).ffill()
+
+        taxa_livre = r["taxa_livre"]
+        cdi_diario = (1 + taxa_livre) ** (1 / opt.DIAS_UTEIS_ANO) - 1
+        cdi_equity = pd.Series([(1 + cdi_diario) ** i * 100 for i in range(len(equity))], index=equity.index)
+
+        cov_anual = retornos.cov() * opt.DIAS_UTEIS_ANO
+        contrib = opt.contribuicao_risco(pesos, cov_anual)
+
+        vc = opt.var_cvar_historico(rp)
+        total = sum(r["valores"]) + self._ler_aporte()
+        self.label_var_cvar.configure(text=(
+            f"VaR diario (95%): {vc['var_diario'] * 100:.2f}% (~R$ {vc['var_diario'] * total:.2f})   |   "
+            f"CVaR diario (95%): {vc['cvar_diario'] * 100:.2f}% (~R$ {vc['cvar_diario'] * total:.2f})   -   "
+            "perda esperada em dia ruim (media dos piores 5% dos dias no periodo historico baixado), "
+            "calculado p/ o alvo escolhido na fronteira."))
+
+        fig = self.fig_risco
+        fig.clear()
+        ax1 = fig.add_subplot(311)
+        ax2 = fig.add_subplot(312)
+        ax3 = fig.add_subplot(313)
+        for ax in (ax1, ax2, ax3):
+            self._estiliza_eixos(ax)
+
+        ax1.plot(equity.index, equity.values, color=HEARTWOOD, linewidth=1.6, label="Carteira (alvo escolhido)")
+        ax1.plot(bm_equity.index, bm_equity.values, color="#4A90D9", linewidth=1.2, label="Ibovespa (BOVA11)")
+        ax1.plot(cdi_equity.index, cdi_equity.values, color=TEXT_MUTED, linewidth=1.2, linestyle="--",
+                  label="CDI aprox. (taxa livre de risco)")
+        ax1.set_title("Desempenho acumulado - buy and hold (base 100)")
+        ax1.legend(loc="upper left", fontsize=8, facecolor=SURFACE, edgecolor=SURFACE_2, labelcolor=TEXT)
+
+        ax2.fill_between(drawdown.index, drawdown.values * 100, 0, color=NEGATIVO, alpha=0.35)
+        ax2.plot(drawdown.index, drawdown.values * 100, color=NEGATIVO, linewidth=1)
+        ax2.set_title("Drawdown da carteira (%)")
+        ax2.set_ylabel("%")
+
+        cores = [cor_ativo(i) for i in range(len(tickers))]
+        ax3.bar(range(len(tickers)), contrib * 100, color=cores)
+        ax3.set_xticks(range(len(tickers)))
+        ax3.set_xticklabels([t.replace(".SA", "") for t in tickers], rotation=45, ha="right")
+        ax3.set_title("Contribuicao de risco por ativo (% da variancia total da carteira)")
+        ax3.set_ylabel("%")
+
+        fig.tight_layout()
+        self.canvas_risco.draw()
 
     def _desenha_correlacao_e_retornos(self, r: dict):
         fig = self.fig_correlacao

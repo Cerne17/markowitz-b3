@@ -46,6 +46,21 @@ def calcula_retornos_diarios(precos: pd.DataFrame) -> pd.DataFrame:
     return precos.pct_change().dropna()
 
 
+BENCHMARK_IBOVESPA = "BOVA11.SA"
+
+
+def obter_dividend_yields(tickers: list[str]) -> dict[str, float | None]:
+    """Dividend yield (%) por ticker, best-effort - so o campo, sem custo de baixar cashflow."""
+    resultado = {}
+    for t in tickers:
+        ticker = normaliza_ticker(t)
+        try:
+            resultado[ticker] = yf.Ticker(ticker).info.get("dividendYield")
+        except Exception:
+            resultado[ticker] = None
+    return resultado
+
+
 def carrega_universo_ativos(caminho: str = "ativos_b3.json") -> list[dict]:
     """Amostra curada de ativos B3 por setor, p/ busca/selecao na UI."""
     with open(caminho, "r", encoding="utf-8") as f:

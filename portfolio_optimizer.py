@@ -117,6 +117,58 @@ def estatisticas_ativo_individual(precos: pd.Series, taxa_livre_risco: float) ->
     }
 
 
+def contribuicao_risco(pesos: np.ndarray, cov_anual: pd.DataFrame) -> np.ndarray:
+    """Fracao da variancia total da carteira explicada por cada ativo (soma = 1).
+
+    Um ativo com peso pequeno mas muito volatil/correlacionado pode dominar o risco
+    mesmo sem dominar a alocacao - essa metrica expoe isso, ao contrario do peso sozinho.
+    """
+    cov = cov_anual.values
+    variancia_total = float(pesos @ cov @ pesos)
+    if variancia_total <= 0:
+        return np.zeros_like(pesos)
+    contrib_marginal = cov @ pesos
+    return (pesos * contrib_marginal) / variancia_total
+
+
+def retornos_portfolio(retornos_diarios: pd.DataFrame, pesos: np.ndarray) -> pd.Series:
+    return retornos_diarios.dot(pesos)
+
+
+def var_cvar_historico(retornos_diarios_portfolio: pd.Series, confianca: float = 0.95) -> dict:
+    """VaR/CVaR historico (nao-parametrico) diario, a partir da serie real de retornos da carteira."""
+    perda_limite = float(np.percentile(retornos_diarios_portfolio, (1 - confianca) * 100))
+    cauda = retornos_diarios_portfolio[retornos_diarios_portfolio <= perda_limite]
+    cvar = float(cauda.mean()) if len(cauda) > 0 else perda_limite
+    return {
+        "confianca": confianca,
+        "var_diario": -perda_limite,   # perda expressa como numero positivo
+        "cvar_diario": -cvar,
+    }
+
+
+LIMITE_ISENCAO_ACOES_MENSAL = 20_000.0
+
+
+def estima_aliquota_ir(classe: str, total_vendas_acoes_etfs_no_rebalanceamento: float) -> str:
+    """Estimativa simplificada da aliquota de IR sobre ganho de capital na venda (regras B3/pessoa fisica).
+
+    Nao calcula o IR em R$ de fato: o app nao rastreia preco medio de compra (custo de
+    aquisicao), entao nao da p/ saber o ganho de capital real - so a aliquota/isencao
+    que se aplicaria. FIIs nao tem isencao por valor; ETFs tampouco (isencao de R$20k/mes
+    e exclusiva de acoes, nao se estende a cotas de fundo por definicao da Receita Federal).
+    """
+    if classe == "FII":
+        return "20% (FIIs nao tem isencao por valor)"
+    if classe in ("Acao", "ETF"):
+        if classe == "ETF":
+            return "15% (ETFs nao tem isencao por valor)"
+        if total_vendas_acoes_etfs_no_rebalanceamento <= LIMITE_ISENCAO_ACOES_MENSAL:
+            return "Isento (vendas de acoes <= R$20mil/mes)"
+        return "15% (vendas de acoes excederam R$20mil no mes)"
+    return "15% (estimado - classe nao identificada)"
+
+
 def pesos_atuais(valores_investidos: list[float]) -> np.ndarray:
     total = sum(valores_investidos)
     if total <= 0:
