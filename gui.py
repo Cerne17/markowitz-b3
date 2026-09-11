@@ -706,12 +706,12 @@ class App(ctk.CTk):
                   "da transacao pode diferir um pouco do ajuste teorico. IR estimado e simplificado: nao "
                   "calcula o ganho de capital real (o app nao rastreia seu preco medio de compra), so "
                   "indica a aliquota/isencao que se aplicaria na venda. Consulte um contador antes de decidir."),
-            font=ctk.CTkFont(size=10), text_color=TEXT_MUTED, wraplength=900, justify="left")
+            font=ctk.CTkFont(size=10), text_color=TEXT_MUTED, wraplength=850, justify="left")
         self.label_nota_ir.grid(row=4, column=0, columnspan=3, sticky="w", padx=16, pady=(0, 6))
 
         self.label_renda_passiva = ctk.CTkLabel(
             self.tab_resumo, text="", font=ctk.CTkFont(size=13, weight="bold"), text_color=SAPWOOD,
-            justify="left", wraplength=900)
+            justify="left", wraplength=850)
         self.label_renda_passiva.grid(row=5, column=0, columnspan=3, sticky="w", padx=16, pady=(0, 14))
 
     def _cria_card(self, master, titulo, coluna, linha=0, destaque=False):
@@ -746,12 +746,24 @@ class App(ctk.CTk):
                                    "investimento.", font=ctk.CTkFont(size=11), text_color=TEXT_MUTED).pack(
             anchor="w", padx=12, pady=(0, 14))
 
+        self._labels_guia_corpo = []
         for titulo, texto in GLOSSARIO:
             ctk.CTkLabel(scroll, text=titulo, font=ctk.CTkFont(size=15, weight="bold"),
                          text_color=HEARTWOOD).pack(anchor="w", padx=12, pady=(10, 2))
-            ctk.CTkLabel(scroll, text=texto, font=ctk.CTkFont(size=13), text_color=TEXT,
-                         wraplength=900, justify="left").pack(anchor="w", padx=12, pady=(0, 4))
+            label_corpo = ctk.CTkLabel(scroll, text=texto, font=ctk.CTkFont(size=13), text_color=TEXT,
+                                        wraplength=800, justify="left")
+            label_corpo.pack(anchor="w", padx=12, pady=(0, 4))
+            self._labels_guia_corpo.append(label_corpo)
             ctk.CTkFrame(scroll, fg_color=SURFACE_2, height=1).pack(fill="x", padx=12, pady=(6, 4))
+
+        # a scrollbar reserva espaco variavel - reajusta o wraplength ao redimensionar
+        # em vez de confiar num valor fixo (que cortava texto em janelas menores)
+        scroll.bind("<Configure>", self._ajusta_wraplength_guia)
+
+    def _ajusta_wraplength_guia(self, event):
+        nova_largura = max(event.width - 40, 240)
+        for label in self._labels_guia_corpo:
+            label.configure(wraplength=nova_largura)
 
     def _monta_tab_risco(self):
         tab = self.tab_risco
