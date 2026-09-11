@@ -150,6 +150,35 @@ GLOSSARIO = [
      "A filosofia do app: voce define a alocacao alvo e a mantem, sem ficar comprando e "
      "vendendo por timing de mercado. O rebalanceamento existe pra dizer quanto ajustar quando "
      "voce tem dinheiro novo pra investir (aporte) - nao pra sugerir trades frequentes."),
+    ("P/VP (Preco sobre Valor Patrimonial)",
+     "Preco atual da cota/acao dividido pelo valor patrimonial por cota (VPA) - o quanto o "
+     "mercado paga por R$1 de patrimonio contabil do ativo. Abaixo de 1 sugere que esta "
+     "negociando abaixo do valor contabil (pode ser oportunidade ou sinal de problema, "
+     "depende do motivo); acima de 1, o mercado paga um premio sobre esse valor. E a metrica "
+     "de valuation mais usada em FIIs (compara preco de mercado da cota com o valor dos "
+     "imoveis/titulos do fundo) e tambem aparece em bancos e seguradoras. ETFs nao tem P/VP "
+     "(nao existe 'patrimonio por cota' no mesmo sentido)."),
+    ("Dividend Yield",
+     "Percentual do preco atual que o ativo pagou em dividendos/JCP nos ultimos 12 meses. "
+     "Yield alto nao e sempre bom sinal - pode ser o preco da cota caindo (yield sobe so "
+     "porque o denominador encolheu), nao a distribuicao aumentando; sempre vale olhar o "
+     "motivo, nao so o numero. E a metrica central em FIIs, onde a renda mensal e o principal "
+     "atrativo pra maioria dos investidores pessoa fisica."),
+    ("TAM (Valor de Mercado / Market Cap)",
+     "Preco da acao/cota multiplicado pelo total de acoes/cotas em circulacao - mede o "
+     "'tamanho' do ativo na bolsa, nao seu valor intrinseco ou qualidade. Serve principalmente "
+     "pra comparar porte entre empresas/fundos do mesmo setor (ex: duas construtoras, dois "
+     "FIIs de logistica)."),
+    ("Capex (Capital Expenditure)",
+     "Quanto a empresa gastou investindo em ativos fixos (maquinas, fabricas, infraestrutura) "
+     "no periodo, tirado do fluxo de caixa. Empresas em expansao tendem a ter capex alto, o "
+     "que reduz caixa livre no curto prazo mas pode sinalizar crescimento futuro - ou excesso "
+     "de gasto, dependendo do retorno que esse investimento gerar. So aparece pra acoes: FIIs "
+     "nao reportam capex tradicional (comprar imovel/titulo e contabilizado diferente)."),
+    ("Faixa de 52 semanas",
+     "Menor e maior preco de fechamento do ativo nos ultimos 12 meses - referencia rapida pra "
+     "saber se o preco atual esta perto do topo ou do fundo do intervalo recente, e o quao "
+     "volatil o ativo foi nesse periodo."),
 ]
 
 ESTILOS_MARCADOR_ESTRATEGIA = {
