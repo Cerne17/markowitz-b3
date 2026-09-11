@@ -92,6 +92,66 @@ ESTRATEGIAS_REFERENCIA = {
 
 # estilo do marcador de cada estrategia no grafico da fronteira - todas aparecem juntas la,
 # mesmo so uma sendo escolhida como "Referencia" no Resumo por vez
+GLOSSARIO = [
+    ("Fronteira Eficiente (Teoria de Markowitz)",
+     "Pra cada nivel de risco (volatilidade), a fronteira mostra a maior combinacao de ativos "
+     "que entrega o maior retorno esperado possivel - carteiras abaixo dela sao ineficientes "
+     "(dava pra ganhar mais com o mesmo risco). Cada ponto da curva branca no grafico e uma "
+     "carteira otima diferente; a nuvem colorida ao redor sao milhares de combinacoes "
+     "aleatorias de peso, coloridas pelo indice de Sharpe. Clique em qualquer ponto (curva ou "
+     "marcador) pra usar aquela alocacao como alvo de rebalanceamento."),
+    ("Indice de Sharpe",
+     "Retorno acima da taxa livre de risco, dividido pela volatilidade total: "
+     "(retorno - taxa livre) / volatilidade. Quanto maior, melhor - mas penaliza toda a "
+     "volatilidade, inclusive a boa (dias em que o ativo sobe muito tambem contam como risco)."),
+    ("Indice de Sortino",
+     "Parecido com o Sharpe, mas so penaliza a volatilidade ruim (retornos abaixo da taxa "
+     "livre de risco) - ignora a variacao positiva. Faz mais sentido pra quem se importa so "
+     "com perdas, nao com toda oscilacao do preco."),
+    ("Indice de Calmar",
+     "Retorno anual dividido pelo maior drawdown historico (a pior queda de pico a vale que a "
+     "carteira sofreu). Muito citado em relatorios de fundos porque fala a lingua do "
+     "investidor: quanto voce ganha por unidade da pior dor que ja sentiu."),
+    ("STARR Ratio",
+     "Como o Sharpe, mas troca a volatilidade pelo CVaR (a perda media nos piores cenarios "
+     "historicos) - foco em risco de cauda (eventos raros e ruins) em vez de dispersao geral "
+     "simetrica."),
+    ("Value at Risk (VaR) e CVaR",
+     "VaR (95%) e a perda que a carteira nao deve ultrapassar em 95% dos dias, com base no "
+     "historico. CVaR e a perda MEDIA justamente nos 5% de dias piores que esse limite - mais "
+     "conservador, porque nao ignora o tamanho da cauda, so a frequencia dela."),
+    ("Max Drawdown",
+     "A maior queda percentual entre um pico e o vale seguinte no historico da carteira. "
+     "Mostra o pior momento psicologico que quem segurou a carteira teria vivido - relevante "
+     "pra saber se voce aguentaria ver seu patrimonio cair aquilo."),
+    ("Equal Weight (1/N)",
+     "Mesmo peso pra cada ativo, sem otimizacao nenhuma. Parece ingenuo, mas estudos classicos "
+     "(DeMiguel, Garlappi & Uppal, 2009) mostram que costuma superar carteiras 'otimizadas' "
+     "fora da amostra, porque nao depende de estimativas de retorno esperado - que sao muito "
+     "ruidosas na pratica."),
+    ("Risk Parity",
+     "Em vez de pesos iguais em R$, iguala a CONTRIBUICAO DE RISCO de cada ativo pra variancia "
+     "total da carteira - um ativo mais volatil recebe menos peso, um mais estavel recebe "
+     "mais. Nao usa retorno esperado no calculo, so a matriz de covariancia, entao e menos "
+     "sensivel a erro de estimativa de retorno."),
+    ("Rebalanceamento e Imposto de Renda",
+     "A sugestao de rebalanceamento mostra quantas cotas comprar/vender pra chegar no alvo "
+     "escolhido, considerando sua carteira atual + o aporte disponivel. A coluna de IR "
+     "estimado indica a aliquota que se aplicaria numa venda: acoes tem isencao se o total "
+     "vendido no mes for ate R$20 mil; ETFs e FIIs nao tem essa isencao (15% e 20% "
+     "respectivamente). E so uma estimativa - o app nao sabe seu preco medio de compra, "
+     "entao nao calcula o ganho de capital real."),
+    ("Renda Passiva (Dividendos)",
+     "Projecao de quanto voce receberia por mes em dividendos, com base no dividend yield "
+     "atual de cada ativo (dado do Yahoo Finance) aplicado ao valor do alvo escolhido. "
+     "Dividendos de acoes e FIIs sao isentos de IR p/ pessoa fisica; Juros sobre Capital "
+     "Proprio (JCP) tem retencao de 15% na fonte."),
+    ("Buy and Hold",
+     "A filosofia do app: voce define a alocacao alvo e a mantem, sem ficar comprando e "
+     "vendendo por timing de mercado. O rebalanceamento existe pra dizer quanto ajustar quando "
+     "voce tem dinheiro novo pra investir (aporte) - nao pra sugerir trades frequentes."),
+]
+
 ESTILOS_MARCADOR_ESTRATEGIA = {
     "Max Sharpe": {"color": "#E89A3C", "marker": "*", "s": 240},
     "Min Volatilidade": {"color": "#4E8F6B", "marker": "*", "s": 200},
@@ -254,6 +314,7 @@ class App(ctk.CTk):
         self.tab_alocacao = self.tabview.add("Alocacao")
         self.tab_risco = self.tabview.add("Risco & Desempenho")
         self.tab_correlacao = self.tabview.add("Correlacao & Retornos")
+        self.tab_guia = self.tabview.add("Guia")
 
         self._monta_tab_explorar()
         self._monta_tab_resumo()
@@ -261,6 +322,7 @@ class App(ctk.CTk):
         self._monta_canvas(self.tab_alocacao, "alocacao")
         self._monta_tab_risco()
         self._monta_canvas(self.tab_correlacao, "correlacao")
+        self._monta_tab_guia()
 
         self.canvas_fronteira.mpl_connect("button_press_event", self._on_click_fronteira)
 
@@ -672,6 +734,24 @@ class App(ctk.CTk):
         canvas.get_tk_widget().pack(fill="both", expand=True, padx=8, pady=8)
         setattr(self, f"fig_{chave}", fig)
         setattr(self, f"canvas_{chave}", canvas)
+
+    def _monta_tab_guia(self):
+        scroll = ctk.CTkScrollableFrame(self.tab_guia, fg_color=SURFACE)
+        scroll.pack(fill="both", expand=True, padx=8, pady=8)
+
+        ctk.CTkLabel(scroll, text="Guia rapido: o que cada metrica/estrategia significa",
+                     font=ctk.CTkFont(size=18, weight="bold"), text_color=TEXT).pack(
+            anchor="w", padx=12, pady=(8, 4))
+        ctk.CTkLabel(scroll, text="Referencia rapida dos conceitos usados no app - nao e recomendacao de "
+                                   "investimento.", font=ctk.CTkFont(size=11), text_color=TEXT_MUTED).pack(
+            anchor="w", padx=12, pady=(0, 14))
+
+        for titulo, texto in GLOSSARIO:
+            ctk.CTkLabel(scroll, text=titulo, font=ctk.CTkFont(size=15, weight="bold"),
+                         text_color=HEARTWOOD).pack(anchor="w", padx=12, pady=(10, 2))
+            ctk.CTkLabel(scroll, text=texto, font=ctk.CTkFont(size=13), text_color=TEXT,
+                         wraplength=900, justify="left").pack(anchor="w", padx=12, pady=(0, 4))
+            ctk.CTkFrame(scroll, fg_color=SURFACE_2, height=1).pack(fill="x", padx=12, pady=(6, 4))
 
     def _monta_tab_risco(self):
         tab = self.tab_risco

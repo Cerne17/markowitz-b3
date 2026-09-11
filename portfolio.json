@@ -1,53 +1,29 @@
 {
   "ativos": [
     {
-      "ticker": "ITUB4.SA",
-      "valor_investido": 0.0
-    },
-    {
-      "ticker": "WEGE3.SA",
-      "valor_investido": 0.0
-    },
-    {
-      "ticker": "MXRF11.SA",
-      "valor_investido": 0.0
-    },
-    {
-      "ticker": "IVVB11.SA",
-      "valor_investido": 0.0
-    },
-    {
-      "ticker": "KNCR11.SA",
-      "valor_investido": 0.0
-    },
-    {
-      "ticker": "AUPO11.SA",
-      "valor_investido": 0.0
-    },
-    {
-      "ticker": "SMAL11.SA",
-      "valor_investido": 0.0
-    },
-    {
-      "ticker": "KLBN4.SA",
-      "valor_investido": 0.0
+      "ticker": "KLBN11.SA",
+      "valor_investido": 293.1
     },
     {
       "ticker": "SBSP3.SA",
-      "valor_investido": 0.0
+      "valor_investido": 271.8
     },
     {
-      "ticker": "BBAS3.SA",
-      "valor_investido": 0.0
+      "ticker": "WEGE3.SA",
+      "valor_investido": 260.85
     },
     {
-      "ticker": "TOTS3.SA",
-      "valor_investido": 0.0
+      "ticker": "PRIO3.SA",
+      "valor_investido": 250.2
+    },
+    {
+      "ticker": "BBSE3.SA",
+      "valor_investido": 121.05
     }
   ],
   "data_inicio": "2022-01-01",
-  "taxa_livre_risco_anual": 0.14,
+  "taxa_livre_risco_anual": 0.1,
   "num_portfolios_simulados": 50000,
-  "peso_maximo_por_ativo": 0.3,
+  "peso_maximo_por_ativo": 1.0,
   "aporte_disponivel": 1000.0
 }

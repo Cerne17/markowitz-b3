@@ -486,6 +486,12 @@
       "nome": "Companhia de Saneamento Básico do Estado de São Paulo - SABESP",
       "setor": "Utilities",
       "classe": "Acao"
+    },
+    {
+      "ticker": "OPCT3.SA",
+      "nome": "OceanPact Serviços Marítimos S.A.",
+      "setor": "Petroleo e Gas",
+      "classe": "Acao"
     }
   ]
 }
